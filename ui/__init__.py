@@ -1,0 +1,1 @@
+# French Exit UI package
