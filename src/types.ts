@@ -58,6 +58,7 @@ export type ProgressEvent =
   | { type: "ScanStarted"; total_scanners: number }
   | { type: "ScanProgress"; scanner_id: string; current: number; total: number; message: string }
   | { type: "ScanCompleted"; item_count: number }
+  | { type: "ScanFailed"; reason: string }
   | { type: "ScanPaused" }
   | { type: "ScanResumed" }
   | { type: "ExecutionStarted"; total_items: number }

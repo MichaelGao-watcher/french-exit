@@ -9,7 +9,7 @@ pub type ExecutionPlanId = String;
 pub type SessionId = String;
 
 /// 痕迹类别
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub enum TraceCategory {
     Chat,
@@ -110,6 +110,7 @@ pub enum ProgressEvent {
         message: String,
     },
     ScanCompleted { item_count: usize },
+    ScanFailed { reason: String },
     ScanPaused,
     ScanResumed,
     ExecutionStarted { total_items: usize },
