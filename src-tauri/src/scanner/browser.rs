@@ -1,6 +1,6 @@
 use crate::scanner::{ScanError, ScanProgress, Scanner};
 use crate::types::{Action, ScanContext, TraceCategory, TraceItem};
-use chrono::{DateTime, Local, NaiveDate, TimeZone};
+use chrono::{DateTime, Local, NaiveDate};
 use rusqlite::Connection;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -136,32 +136,26 @@ impl BrowserScanner {
 
     /// 将入职日期转换为 Chrome 时间（1601-01-01 00:00:00 UTC 以来的微秒数）
     fn naive_date_to_chrome_time(date: NaiveDate) -> i64 {
-        let unix_secs = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
+        let unix_secs = date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
         (unix_secs + 11_644_473_600) * 1_000_000
     }
 
     /// Chrome 时间（微秒）→ DateTime<Local>
     fn chrome_time_to_datetime(chrome_time: i64) -> Option<DateTime<Local>> {
         let unix_secs = (chrome_time / 1_000_000) - 11_644_473_600;
-        match Local.timestamp_opt(unix_secs, 0) {
-            chrono::LocalResult::Single(dt) => Some(dt),
-            _ => None,
-        }
+        DateTime::from_timestamp(unix_secs, 0).map(|dt| dt.with_timezone(&Local))
     }
 
     /// 将入职日期转换为 Firefox 时间（1970-01-01 以来的微秒数）
     fn naive_date_to_firefox_time(date: NaiveDate) -> i64 {
-        let unix_secs = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
+        let unix_secs = date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
         unix_secs * 1_000_000
     }
 
     /// Firefox 时间（微秒）→ DateTime<Local>
     fn firefox_time_to_datetime(firefox_time: i64) -> Option<DateTime<Local>> {
         let unix_secs = firefox_time / 1_000_000;
-        match Local.timestamp_opt(unix_secs, 0) {
-            chrono::LocalResult::Single(dt) => Some(dt),
-            _ => None,
-        }
+        DateTime::from_timestamp(unix_secs, 0).map(|dt| dt.with_timezone(&Local))
     }
 
     // ── 通用辅助 ─────────────────────────────────────────────────
@@ -203,7 +197,7 @@ impl BrowserScanner {
         path: &Path,
         start_date: NaiveDate,
         browser_prefix: &str,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let conn = Connection::open(path).map_err(|e| {
             // Chrome/Edge 正在运行时数据库会被锁定，捕获 SQLITE_BUSY 等错误
@@ -306,7 +300,7 @@ impl BrowserScanner {
     fn scan_firefox_history(
         path: &Path,
         start_date: NaiveDate,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let conn = Connection::open(path).map_err(|e| {
             if let rusqlite::Error::SqliteFailure(_, _) = e {
@@ -416,7 +410,7 @@ impl Scanner for BrowserScanner {
         &self,
         ctx: &ScanContext,
         _pause_rx: &tokio::sync::watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut all_items = Vec::new();
 
@@ -500,7 +494,7 @@ mod tests {
         let chrome_time = BrowserScanner::naive_date_to_chrome_time(date);
 
         // 验证正向转换：Unix 时间戳 + 11644473600 秒，再转微秒
-        let unix_secs = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
+        let unix_secs = date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
         assert_eq!(chrome_time, (unix_secs + 11_644_473_600) * 1_000_000);
 
         // 验证反向转换
@@ -513,7 +507,7 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2024, 6, 15).unwrap();
         let firefox_time = BrowserScanner::naive_date_to_firefox_time(date);
 
-        let unix_secs = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
+        let unix_secs = date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
         assert_eq!(firefox_time, unix_secs * 1_000_000);
 
         let dt = BrowserScanner::firefox_time_to_datetime(firefox_time).unwrap();

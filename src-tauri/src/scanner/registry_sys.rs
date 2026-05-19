@@ -34,7 +34,7 @@ impl Scanner for RegistryScanner {
         &self,
         _ctx: &ScanContext,
         _pause_rx: &watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         // 待扫描的注册表路径列表
         let subkeys = [
@@ -82,7 +82,7 @@ fn scan_key(hkey: HKEY, subpath: &str, items: &mut Vec<TraceItem>) -> Result<(),
         RegOpenKeyExW(
             hkey,
             PCWSTR(subkey_wide.as_ptr()),
-            0,
+            Some(0),
             KEY_READ,
             &mut hsubkey,
         )
@@ -112,12 +112,12 @@ fn scan_key(hkey: HKEY, subpath: &str, items: &mut Vec<TraceItem>) -> Result<(),
             RegEnumValueW(
                 hsubkey,
                 index,
-                PWSTR(name_buf.as_mut_ptr()),
+                Some(PWSTR(name_buf.as_mut_ptr())),
                 &mut name_len,
-                std::ptr::null(),
-                &mut data_type,
-                data_buf.as_mut_ptr(),
-                &mut data_len,
+                Some(std::ptr::null()),
+                Some(&mut data_type),
+                Some(data_buf.as_mut_ptr()),
+                Some(&mut data_len),
             )
         };
 

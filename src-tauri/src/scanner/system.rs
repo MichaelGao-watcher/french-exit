@@ -47,7 +47,7 @@ impl SystemScanner {
     fn scan_recent_docs(
         recent_dir: &Path,
         start_date: NaiveDate,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut items = Vec::new();
 
@@ -132,7 +132,7 @@ impl SystemScanner {
     fn scan_temp_dir(
         temp_dir: &Path,
         start_date: NaiveDate,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut items = Vec::new();
 
@@ -262,7 +262,7 @@ impl Scanner for SystemScanner {
         &self,
         ctx: &ScanContext,
         _pause_rx: &tokio::sync::watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut all_items = Vec::new();
 

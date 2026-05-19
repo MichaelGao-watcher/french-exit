@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use walkdir::WalkDir;
 use zip::write::FileOptions;
@@ -21,6 +21,10 @@ pub struct PackExecutor {
     output_dir: PathBuf,
     items: Mutex<Vec<TraceItem>>,
     seen_paths: Mutex<HashSet<PathBuf>>,
+    /// 加密文件回调：传入文件路径，返回 true 表示用户确认打包，false 表示跳过
+    on_encrypted: Option<Arc<dyn Fn(&Path) -> bool + Send + Sync>>,
+    /// 记录被用户跳过的加密文件对应的 item_id
+    skipped_items: Mutex<Vec<String>>,
 }
 
 impl PackExecutor {
@@ -28,12 +32,27 @@ impl PackExecutor {
     ///
     /// # 参数
     /// - `output_dir`: zip 文件输出目录
-    pub fn new(output_dir: PathBuf) -> Self {
+    /// - `on_encrypted`: 可选的加密文件确认回调。传入文件路径，返回 true 表示确认打包，false 表示跳过。
+    pub fn new(
+        output_dir: PathBuf,
+        on_encrypted: Option<Arc<dyn Fn(&Path) -> bool + Send + Sync>>,
+    ) -> Self {
         Self {
             output_dir,
             items: Mutex::new(Vec::new()),
             seen_paths: Mutex::new(HashSet::new()),
+            on_encrypted,
+            skipped_items: Mutex::new(Vec::new()),
         }
+    }
+
+    /// 取出所有被用户跳过的加密文件 item_id（消费后清空内部记录）
+    pub fn take_skipped_items(&self) -> Vec<String> {
+        self.skipped_items
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .drain(..)
+            .collect()
     }
 
     /// 计算所有待打包文件的总大小（字节）
@@ -79,6 +98,51 @@ impl PackExecutor {
         }
     }
 
+    /// 获取指定路径所在磁盘的可用空间（字节）
+    #[cfg(target_os = "windows")]
+    fn available_disk_space(path: &Path) -> Result<u64, BackendError> {
+        use windows::core::HSTRING;
+        use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+
+        let path_str = HSTRING::from(path.as_os_str());
+        let mut free_bytes = 0u64;
+        unsafe {
+            GetDiskFreeSpaceExW(
+                &path_str,
+                Some(&mut free_bytes),
+                None,
+                None,
+            )
+        }
+        .map_err(|e| BackendError::ExecutionError(format!("获取磁盘空间失败: {}", e)))?;
+
+        Ok(free_bytes)
+    }
+
+    /// 非 Windows 平台 fallback（本项目主要为 Windows，此分支仅用于编译兼容）
+    #[cfg(not(target_os = "windows"))]
+    fn available_disk_space(_path: &Path) -> Result<u64, BackendError> {
+        Ok(u64::MAX)
+    }
+
+    /// 找到一个已存在的路径用于磁盘空间检查
+    ///
+    /// 如果 output_dir 不存在，则向上查找最近存在的父目录；
+    /// 若全部不存在，则回退到当前工作目录。
+    fn disk_space_check_path(output_dir: &Path) -> PathBuf {
+        if output_dir.exists() {
+            return output_dir.to_path_buf();
+        }
+        let mut current = output_dir;
+        while let Some(parent) = current.parent() {
+            if parent.exists() {
+                return parent.to_path_buf();
+            }
+            current = parent;
+        }
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    }
+
     /// 生成最终 zip 文件
     ///
     /// # 流程
@@ -93,11 +157,20 @@ impl PackExecutor {
             .lock()
             .map_err(|e| BackendError::ExecutionError(format!("打包列表锁 poisoned: {}", e)))?;
 
-        let _total_size = Self::total_size(&items);
+        let total_size = Self::total_size(&items);
 
-        // TODO: 磁盘空间预检查
-        // Windows 下需调用 GetDiskFreeSpaceExW，当前版本暂跳过，后续迭代补充。
-        // let required = (_total_size as f64 * 1.1) as u64;
+        // 磁盘空间预检查：需要预留 110% 的空间（zip 压缩有额外开销）
+        if total_size > 0 {
+            let required = (total_size as f64 * 1.1) as u64;
+            let check_path = Self::disk_space_check_path(&self.output_dir);
+            let available = Self::available_disk_space(&check_path)?;
+            if available < required {
+                return Err(BackendError::ExecutionError(format!(
+                    "磁盘空间不足: 需要 {} 字节（含 10% 预留），可用 {} 字节",
+                    required, available
+                )));
+            }
+        }
 
         // 确保输出目录存在
         if !self.output_dir.exists() {
@@ -107,7 +180,7 @@ impl PackExecutor {
         let zip_path = self.output_dir.join("French-exit.zip");
         let zip_file = File::create(&zip_path)?;
         let mut zip_writer = ZipWriter::new(zip_file);
-        let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+        let options: FileOptions<'_, ()> = FileOptions::default().compression_method(CompressionMethod::Deflated);
 
         // 获取用户主目录，用于计算 zip 内相对路径
         let user_home = std::env::var("USERPROFILE")
@@ -129,9 +202,17 @@ impl PackExecutor {
             if path.is_file() {
                 let zip_path_str = Self::to_zip_path(path, &user_home);
 
-                // 加密文件检测（简化版，不实现回调）
+                // 加密文件检测与回调确认
                 if Self::is_encrypted_file(path) {
-                    // TODO: 后续迭代实现加密文件回调确认机制
+                    if let Some(ref callback) = self.on_encrypted {
+                        if !callback(path) {
+                            // 用户取消该加密文件，记录 item_id 并跳过
+                            if let Ok(mut skipped) = self.skipped_items.lock() {
+                                skipped.push(item.id.clone());
+                            }
+                            continue;
+                        }
+                    }
                 }
 
                 // 跳过 zip 内重复路径
@@ -161,6 +242,16 @@ impl PackExecutor {
                     let entry_path = entry.path();
                     if !entry_path.is_file() {
                         continue;
+                    }
+
+                    // 加密文件检测与回调确认（目录内子文件）
+                    if Self::is_encrypted_file(entry_path) {
+                        if let Some(ref callback) = self.on_encrypted {
+                            if !callback(entry_path) {
+                                // 用户取消该加密文件，跳过但不记录整个 item
+                                continue;
+                            }
+                        }
                     }
 
                     let zip_path_str = Self::to_zip_path(entry_path, &user_home);
@@ -229,11 +320,12 @@ impl Executor for PackExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::TraceCategory;
 
     #[test]
     fn test_pack_deduplication() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let executor = PackExecutor::new(temp_dir.path().to_path_buf());
+        let executor = PackExecutor::new(temp_dir.path().to_path_buf(), None);
 
         let item1 = TraceItem {
             id: "a".to_string(),
@@ -271,7 +363,7 @@ mod tests {
     #[test]
     fn test_pack_executor_different_paths() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let executor = PackExecutor::new(temp_dir.path().to_path_buf());
+        let executor = PackExecutor::new(temp_dir.path().to_path_buf(), None);
 
         let item1 = TraceItem {
             id: "a".to_string(),
@@ -318,6 +410,74 @@ mod tests {
         let user_home = Path::new("C:\\Users\\Test");
         let file = Path::new("D:\\Other\\file.txt");
         assert_eq!(PackExecutor::to_zip_path(file, user_home), "file.txt");
+    }
+
+    #[test]
+    fn test_encrypted_file_callback_skip() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let output_dir = temp_dir.path().join("output");
+        let encrypted_file = temp_dir.path().join("secret.enc");
+        std::fs::write(&encrypted_file, "encrypted data").unwrap();
+
+        // 回调返回 false（用户取消）
+        let callback: Arc<dyn Fn(&Path) -> bool + Send + Sync> = Arc::new(|_| false);
+        let executor = PackExecutor::new(output_dir, Some(callback));
+
+        let item = TraceItem {
+            id: "enc-1".to_string(),
+            category: TraceCategory::FileSystem,
+            scanner_id: "test".to_string(),
+            name: "secret.enc".to_string(),
+            path: Some(encrypted_file),
+            size_bytes: Some(14),
+            modified_at: None,
+            inferred: false,
+            risk_note: None,
+            suggested_action: Some(Action::Pack),
+        };
+
+        executor.execute(&item).unwrap();
+        let zip_path = executor.finalize().unwrap();
+        assert_eq!(executor.take_skipped_items(), vec!["enc-1"]);
+
+        // zip 文件应存在，但因为跳过了加密文件，里面没有内容
+        let zip_file = File::open(&zip_path).unwrap();
+        let archive = zip::ZipArchive::new(zip_file).unwrap();
+        assert_eq!(archive.len(), 0);
+    }
+
+    #[test]
+    fn test_encrypted_file_callback_confirm() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let output_dir = temp_dir.path().join("output");
+        let encrypted_file = temp_dir.path().join("secret.enc");
+        std::fs::write(&encrypted_file, "encrypted data").unwrap();
+
+        // 回调返回 true（用户确认）
+        let callback: Arc<dyn Fn(&Path) -> bool + Send + Sync> = Arc::new(|_| true);
+        let executor = PackExecutor::new(output_dir, Some(callback));
+
+        let item = TraceItem {
+            id: "enc-1".to_string(),
+            category: TraceCategory::FileSystem,
+            scanner_id: "test".to_string(),
+            name: "secret.enc".to_string(),
+            path: Some(encrypted_file),
+            size_bytes: Some(14),
+            modified_at: None,
+            inferred: false,
+            risk_note: None,
+            suggested_action: Some(Action::Pack),
+        };
+
+        executor.execute(&item).unwrap();
+        let zip_path = executor.finalize().unwrap();
+        assert!(executor.take_skipped_items().is_empty());
+
+        // zip 文件中应包含该加密文件
+        let zip_file = File::open(&zip_path).unwrap();
+        let archive = zip::ZipArchive::new(zip_file).unwrap();
+        assert_eq!(archive.len(), 1);
     }
 
     #[test]

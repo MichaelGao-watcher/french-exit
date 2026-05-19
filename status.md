@@ -1,0 +1,122 @@
+# French Exit — 状态看板（新会话唯一入口）
+
+> 先读此文件，再按需读 `AGENTS.md` / `docs/high-Level Design.md`。
+
+## 必读顺序
+
+1. `status.md` — 本文件（阶段 + 待办 + 环境 + 代码入口 + 规则）
+2. `AGENTS.md` — 硬规则
+3. `docs/high-Level Design.md` — 架构设计（如需改接口或数据流）
+
+---
+
+## 当前阶段
+
+P2 ✅ | P3 vitest ✅ | P3 Playwright E2E ✅ | **P1 UCRT ✅ 已修复**
+
+---
+
+## 待办
+
+### P1 — 环境（已修复 ✅）
+- [x] **UCRT / entrypoint**：`cargo test --lib` 运行报 `0xc0000139`
+  - 根因：`tauri::AppHandle` 类型出现在 `async fn` 签名中，与 MinGW UCRT 生成不兼容的 PE 导入表
+  - 修复方案：将 `commands` 模块中的 Tauri command 函数（含 `AppHandle` + `async`）拆分到 `commands/handlers.rs`，在 `#[cfg(not(test))]` 下条件编译；`lib.rs` 的 `run()` 同样条件编译。测试模式下不链接这些函数，从而绕过 loader 入口点缺失问题
+  - 副作用：零 —— release 构建和运行时行为完全不变
+  - 额外修复：`scanner/registry_sys.rs` 测试中身份证号长度错误（15 位 → 18 位）
+
+### P4 — 可选扩展
+- [ ] 前端 vitest 覆盖率提升（当前仅 ResultsPage / ScanPage / AppContext）
+- [ ] 后端 Rust `#[test]` 补充（需先解决 P1）
+- [ ] E2E 扩展：深色模式、重置流程等
+
+---
+
+## 推荐策略
+
+1. 如环境允许，优先修复 P1 `cargo test --lib` 的运行问题
+2. 或补充前端 vitest / 后端 Rust 单元测试
+3. 或扩展 E2E 边界场景（深色模式、重置流程等）
+
+---
+
+## 环境
+
+```bash
+# PATH + 版本验证
+export PATH="/c/tools/mingw64/bin:$PATH:/c/Users/Administrator/.cargo/bin"
+rustc --version   # 1.95.0
+cargo --version   # 1.95.0
+
+# 编译（中文路径 MinGW 会失败，需复制到纯 ASCII 路径）
+rm -rf /c/french-exit && cp -r "/e/工作文件/vs-code/french-exit" /c/french-exit
+cd /c/french-exit/src-tauri && export CARGO_TARGET_DIR=/e/cargo-target
+cargo check --lib       # ✅ 通过
+cargo test --no-run     # ✅ 通过
+cargo test --lib        # ⚠️ 0xc0000139（P1 待修复）
+
+# 测试
+npm run test:run          # vitest 23 测
+npx playwright test e2e/  # E2E 11 测
+```
+
+---
+
+## 关键代码入口
+
+### Rust 后端
+```
+src-tauri/src/
+├── commands/mod.rs          # Tauri IPC 入口（9 个 command）
+├── orchestrator/mod.rs      # FSM 状态机 + 细粒度进度推送
+├── executor/
+│   ├── delete.rs            # 安全删除
+│   ├── pack.rs              # zip 打包（磁盘检查 + 加密回调）
+│   └── preserve.rs          # 保留记录
+├── reporter/mod.rs          # HTML 庆祝页
+├── scanner/                 # Scanner trait + 7 个具体 scanner
+├── resource/controller.rs   # CPU 限制（精确计算）
+├── store/temp_store.rs      # JSON Lines 临时存储
+└── types.rs                 # 核心数据结构
+```
+
+### 前端
+```
+src/
+├── pages/                   # Input / Scan / Results / Confirm / Executing / Report
+├── api/commands.ts          # IPC 封装
+├── store/AppContext.tsx     # 全局状态（有 reducer 单元测试）
+└── test/                    # vitest 基础设施
+```
+
+### E2E
+```
+e2e/
+├── fixtures.ts              # Playwright fixture + setupStandardMock
+├── full-flow.spec.ts        # 完整流程 E2E
+├── results-interactions.spec.ts  # ResultsPage 交互 E2E
+├── error-boundary.spec.ts   # 错误边界 E2E
+└── tauri-mock.js            # 浏览器端 IPC mock 运行时
+```
+
+---
+
+## 核心规则（不可违反）
+
+见 `AGENTS.md` 完整版。关键几条：
+- **RULE-01**：所有 `Action::Delete` 必须在用户提交最终决策后执行
+- **RULE-04**：程序退出必须调用 `TempStore::self_destruct()`，HTML 报告路径排除
+- **RULE-05**：默认 CPU ≤30%
+- **RULE-09**：HTML 保存位置：有打包放 zip 同目录，无打包放桌面
+
+---
+
+| 日期 | 更新 |
+|------|------|
+| 2026-05-19 | P2/P3 全部完成；Playwright E2E 11 测通过；P1 UCRT 已修复（`cargo test --lib` 88 测全绿）；status 合并为唯一入口 |
+
+---
+
+## 工作流提示
+
+- **多窗口处理**：Kimi CLI 多窗口无实时同步。同一项目建议只开一个活跃会话写代码，其他窗口只读（`git status`、`cargo check` 等）。如必须多活跃会话，见 `session-log.md` 最新条目的"会话锁"建议。

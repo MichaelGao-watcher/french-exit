@@ -53,7 +53,7 @@ pub fn run() {
     let pack_output_dir = std::env::var("USERPROFILE")
         .map(|p| std::path::PathBuf::from(p).join("Desktop"))
         .unwrap_or_else(|_| std::env::temp_dir());
-    let pack_executor = executor::pack::PackExecutor::new(pack_output_dir);
+    let pack_executor = executor::pack::PackExecutor::new(pack_output_dir, None);
 
     let preserve_executor = executor::preserve::PreserveExecutor::new();
 

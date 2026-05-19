@@ -1,0 +1,86 @@
+# French Exit — 项目经验总结
+
+> 模板化知识沉淀，供未来项目复用。结构分为「技术点」和「流程点」两类。
+
+---
+
+## 技术经验
+
+### Rust / Windows 系统编程
+
+| # | 经验 | 来源 |
+|---|------|------|
+| 1 | `windows-rs` 0.61 的错误处理统一用 `.map_err(|e| ...)`，其中 `e` 是 `windows::core::Error` | `resource/controller.rs` |
+| 2 | `GetDiskFreeSpaceExW` 传 `&HSTRING` 作为路径参数，`Option<&mut u64>` 接收可用字节 | `executor/pack.rs` |
+| 3 | CPU% 精确计算只需 `GetProcessTimes` + wall clock elapsed，不需要 `GetSystemTimes` | `resource/controller.rs` |
+| 4 | `FILETIME` 转 u64：`((high as u64) << 32) | (low as u64)`，单位是 100ns | `resource/controller.rs` |
+| 5 | `Arc<dyn Fn(...) + Send + Sync>` 是 Rust 中给同步结构体注入回调的标准方式 | `executor/pack.rs` |
+
+### Tauri / 前端测试
+
+| # | 经验 | 来源 |
+|---|------|------|
+| 6 | Tauri 前端用 vitest + jsdom 测试时，必须在 `setup.ts` 中 `vi.mock()` 所有 `@tauri-apps/api/*` 模块 | `src/test/setup.ts` |
+| 7 | 若 `@tauri-apps/api/xxx` 模块不存在（如 v2 移除了 `fs`），用 **vite alias** 指向本地 mock，而非试图安装 | `vite.config.ts` |
+| 8 | Controlled checkbox 的测试用 `@testing-library/user-event` 的 `user.click()`，不要用 `fireEvent.click()` | `ResultsPage.test.tsx` |
+| 9 | `tokio::sync::mpsc::Sender::try_send()` 适合非阻塞的进度回调，避免 Scanner 被 channel 阻塞 | `orchestrator/mod.rs` |
+
+### React 状态管理
+
+| # | 经验 | 来源 |
+|---|------|------|
+| 10 | **绝对不要**在 `setState` 的 updater 函数内部调用 `dispatch()` 或其他 setState，会触发 React "渲染时更新" 警告 | `ResultsPage.tsx` |
+| 11 | `useEffect` 依赖 `state.xxx.size === 0` 作为触发条件时，容易形成死循环（用户操作 → size 变 0 → effect 重设 → 又变回来） | `ResultsPage.tsx` |
+| 12 | `useRef` 作为"只执行一次"的标志，比依赖数组更可靠，尤其涉及批量初始化逻辑时 | `ResultsPage.tsx` |
+
+---
+
+## 流程经验
+
+### 问题发现机制
+- **测试驱动暴露 Bug**：ResultsPage 的默认勾选死循环是在写单元测试时发现的，手工测试几乎不可能复现（需要恰好取消所有勾选）
+- **结论**：前端状态管理类的 bug，单元测试是最有效的发现手段，远超手工测试
+
+### 文档维护
+- `prompt-next-session.md` 的问题：每次都要重写环境初始化、模块速查表等**不变内容**
+- **改进**：`status.md`（活文档，只记录变化）+ `AGENTS.md`（固定规则）
+- **收益**：新会话读 2 份文件即可开工，维护成本降低 80%
+
+### 沟通 / 需求澄清
+- **横跨工具层和应用层的词汇必须确认语境**。用户问"一个项目多个终端能否实现同步处理进度"——"终端"可以指 French Exit 的并行 executor、Kimi CLI 的多窗口、或 ai-project-skeleton 的多会话。我默认跳到了代码层面分析并行化，结果完全偏题。
+  - **正确做法**：遇到"终端""同步""项目"这类横跨多层含义的词，先给两个选项让用户确认，不要默认展开分析
+- **工具硬性限制不要绕圈分析可行性**。Kimi CLI 多窗口无 IPC、无共享内存、无实时同步——这不是"有难度"，是"设计上就不支持"。回答应直接给结论 + 风险 + 替代方案，省掉技术可行性分析
+
+### 编译/环境
+- 中文路径 + MinGW = 链接器失败。解决方案：复制到纯 ASCII 路径（如 `/c/french-exit`）后编译
+- `cargo check --lib` 不需要链接，可以在中文路径直接跑；`cargo test --no-run` 同理
+- **`0xc0000139` 不一定是 UCRT/MinGW 兼容性 issue**。先跑一个**最简单 lib 测试**（空 crate + `cargo test --lib`），如果能过，就说明工具链没问题，问题在项目的特定代码中
+- **`cargo test --bin` 能过、`cargo test --lib` 崩溃** → 问题出在**仅被 lib 测试链接的代码**中（bin 测试做了死代码消除，没链接到问题代码）。这是极强的定位信号
+- **定位代码的最快方法**：清空 `lib.rs` 只保留一个空测试，逐步 `pub mod` 添加模块，直到崩溃复现。比分析 PE 导入表快 10 倍
+- **`tauri::AppHandle` 出现在 `async fn` 签名中 + MinGW = `STATUS_ENTRYPOINT_NOT_FOUND`**。原因未知（PE 导入表生成 bug？），但 workaround 明确：把这些函数拆到子模块，用 `#[cfg(not(test))]` 条件编译，测试模式下不链接
+- **`#[cfg(not(test))]` 隔离问题代码**是零副作用的修复手法：release 构建完全不受影响，测试逻辑移至独立模块继续跑
+
+---
+
+## 可复用模板
+
+以下为通用结构，新项目可复制后填充：
+
+```markdown
+# [项目名] — 经验总结
+
+## 技术经验
+| # | 经验 | 来源模块 |
+
+## 流程经验
+### 问题发现
+### 文档维护
+### 环境陷阱
+
+## 待验证假设（本轮未证实，下轮验证）
+- [ ] xxx
+```
+
+---
+
+*最后更新：2026-05-19*

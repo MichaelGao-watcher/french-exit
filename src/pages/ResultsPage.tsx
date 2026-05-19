@@ -10,7 +10,7 @@
  * 6. 应用默认勾选规则（RULE-02 / RULE-03）
  * 7. 支持文件预览弹窗
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppState } from "../store/AppContext";
 import { getScanResults } from "../api/commands";
 import type { TraceCategory, TraceItem, Decision } from "../types";
@@ -79,6 +79,7 @@ export function ResultsPage() {
   const [previewItem, setPreviewItem] = useState<TraceItem | null>(null);
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const hasAppliedDefaults = useRef(false);
   const PAGE_SIZE = 50;
 
   // 数据加载
@@ -107,8 +108,9 @@ export function ResultsPage() {
     }
   };
 
-  // 默认勾选逻辑（RULE-02 / RULE-03）
+  // 默认勾选逻辑（RULE-02 / RULE-03），仅在首次加载扫描结果时执行一次
   useEffect(() => {
+    if (hasAppliedDefaults.current) return;
     if (state.scanResults.length > 0 && state.decisions.size === 0) {
       const defaultDecisions = new Map<string, Decision>();
       const defaultSelected = new Set<string>();
@@ -125,6 +127,7 @@ export function ResultsPage() {
         }
       });
 
+      hasAppliedDefaults.current = true;
       dispatch({ type: "SET_DECISIONS", payload: defaultDecisions });
       setSelectedIds(defaultSelected);
     }
@@ -147,29 +150,25 @@ export function ResultsPage() {
   const totalCount = state.scanTotal;
 
   const toggleItem = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      const item = state.scanResults.find((i) => i.id === id);
-      if (!item) return prev;
+    const item = state.scanResults.find((i) => i.id === id);
+    if (!item) return;
 
-      if (next.has(id)) {
-        next.delete(id);
-        // 取消勾选：从 decisions 中移除
-        const newDecisions = new Map(state.decisions);
-        newDecisions.delete(id);
-        dispatch({ type: "SET_DECISIONS", payload: newDecisions });
-      } else {
-        next.add(id);
-        // 勾选：按 suggested_action 设置默认决策
-        const action = getDefaultAction(item);
-        if (action) {
-          const newDecisions = new Map(state.decisions);
-          newDecisions.set(id, { item_id: id, action });
-          dispatch({ type: "SET_DECISIONS", payload: newDecisions });
-        }
+    const next = new Set(selectedIds);
+    const newDecisions = new Map(state.decisions);
+
+    if (next.has(id)) {
+      next.delete(id);
+      newDecisions.delete(id);
+    } else {
+      next.add(id);
+      const action = getDefaultAction(item);
+      if (action) {
+        newDecisions.set(id, { item_id: id, action });
       }
-      return next;
-    });
+    }
+
+    setSelectedIds(next);
+    dispatch({ type: "SET_DECISIONS", payload: newDecisions });
   };
 
   const selectAllPage = () => {

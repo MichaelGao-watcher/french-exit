@@ -5,12 +5,12 @@ use std::sync::Arc;
 use ts_rs::TS;
 
 use crate::error::BackendError;
-use crate::executor::{delete::DeleteExecutor, pack::PackExecutor, preserve::PreserveExecutor};
+use crate::executor::{delete::DeleteExecutor, pack::PackExecutor, preserve::PreserveExecutor, Executor};
 use crate::reporter::Reporter;
 use crate::resource::controller::ResourceController;
 use crate::scanner::registry::ScannerRegistry;
 use crate::store::temp_store::TempStore;
-use crate::types::{Action, Decision, ExecutionReport, ExecutionResult, ExecutionStatus, ScanContext};
+use crate::types::{Action, Decision, ExecutionReport, ExecutionResult, ExecutionStatus, ProgressEvent, ScanContext};
 
 /// 会话状态机（FSM）
 ///
@@ -62,6 +62,8 @@ pub struct Orchestrator {
     current_scan_id: Arc<std::sync::Mutex<Option<String>>>,
     /// 用户提交的决策清单，在 submit_decisions 时写入
     decisions: Arc<std::sync::Mutex<Vec<Decision>>>,
+    /// 扫描进度发送通道（由 Commands 层注入）
+    progress_tx: Arc<std::sync::Mutex<Option<tokio::sync::mpsc::Sender<ProgressEvent>>>>,
 }
 
 impl Orchestrator {
@@ -88,6 +90,7 @@ impl Orchestrator {
             pause_tx: Arc::new(std::sync::Mutex::new(None)),
             current_scan_id: Arc::new(std::sync::Mutex::new(None)),
             decisions: Arc::new(std::sync::Mutex::new(Vec::new())),
+            progress_tx: Arc::new(std::sync::Mutex::new(None)),
         }
     }
 
@@ -146,6 +149,13 @@ impl Orchestrator {
         )
     }
 
+    /// 设置进度发送通道（由 Commands 层在扫描前注入）
+    pub fn set_progress_tx(&self, tx: tokio::sync::mpsc::Sender<ProgressEvent>) {
+        if let Ok(mut guard) = self.progress_tx.lock() {
+            *guard = Some(tx);
+        }
+    }
+
     /// 启动扫描
     ///
     /// 1. 校验当前状态为 Idle，否则返回错误
@@ -157,9 +167,7 @@ impl Orchestrator {
     /// 7. 扫描结果分批落盘到 TempStore（每批 500 条）
     /// 8. 完成后自动转为 Scanned（或 Failed）
     ///
-    /// 返回 scan_id 供前端追踪。
-    ///
-    /// TODO: OR-16 后续迭代实现扫描阶段的部分结果实时推送到前端。
+    /// 扫描过程中，各 Scanner 的细粒度进度通过 `progress_tx` 实时推送到前端。
     pub fn start_scan(&self, ctx: ScanContext) -> Result<String, BackendError> {
         let scan_id = uuid::Uuid::new_v4().to_string();
 
@@ -181,11 +189,24 @@ impl Orchestrator {
         let store = Arc::clone(&self.temp_store);
         let state = Arc::clone(&self.state);
         let scan_id_for_task = scan_id.clone();
+        let progress_tx = Arc::clone(&self.progress_tx);
 
         tokio::spawn(async move {
-            // 当前版本进度回调为空闭包，OR-16 后续迭代替换为前端推送通道
-            let progress_callback = |_p: crate::scanner::ScanProgress| {
-                // 扫描进度接收点，留作后续接入 WebSocket / Event 推送
+            // 细粒度进度回调：将 ScanProgress 转为 ProgressEvent 推送到前端
+            let progress_callback = {
+                let tx = progress_tx;
+                move |p: crate::scanner::ScanProgress| {
+                    if let Ok(guard) = tx.lock() {
+                        if let Some(ref sender) = *guard {
+                            let _ = sender.try_send(ProgressEvent::ScanProgress {
+                                scanner_id: p.scanner_id,
+                                current: p.current,
+                                total: p.total,
+                                message: p.message,
+                            });
+                        }
+                    }
+                }
             };
 
             match registry.scan_all(&ctx, &pause_rx, &progress_callback).await {
@@ -437,6 +458,23 @@ impl Orchestrator {
                 None
             }
         };
+
+        // 处理被用户跳过的加密文件：将对应 ExecutionResult 从 Success 改为 Skipped
+        let skipped_ids = self.pack_executor.take_skipped_items();
+        for skipped_id in &skipped_ids {
+            if let Some(result) = results.iter_mut().find(|r| r.item_id == *skipped_id) {
+                if matches!(result.status, crate::types::ExecutionStatus::Success) {
+                    result.status = crate::types::ExecutionStatus::Skipped(
+                        "用户取消加密文件打包".to_string(),
+                    );
+                    result.detail = Some("检测到加密文件，用户选择不打包".to_string());
+                    if let Some(item) = item_map.get(skipped_id) {
+                        packed_count = packed_count.saturating_sub(1);
+                        packed_bytes = packed_bytes.saturating_sub(item.size_bytes.unwrap_or(0));
+                    }
+                }
+            }
+        }
 
         let report = ExecutionReport {
             deleted_count,

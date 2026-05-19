@@ -1,9 +1,10 @@
 use std::sync::Mutex;
+use std::time::Instant;
 use crate::error::BackendError;
 use crate::types::ResourceConfig;
 use windows::Win32::System::JobObjects::*;
-use windows::Win32::System::Threading::GetCurrentProcess;
-use windows::Win32::Foundation::{CloseHandle, HANDLE};
+use windows::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes};
+use windows::Win32::Foundation::{CloseHandle, FILETIME, HANDLE};
 
 /// 资源使用率快照
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -12,10 +13,23 @@ pub struct ResourceUsage {
     pub memory_mb: u64,
 }
 
+/// CPU 时间采样点（用于计算 CPU%）
+#[derive(Debug, Clone, Copy)]
+struct CpuSample {
+    process_time: u64,
+    timestamp: Instant,
+}
+
 /// 资源控制器，通过 Windows Job Object 限制当前进程的 CPU 使用率。
+#[derive(Clone, Copy)]
+struct JobHandle(HANDLE);
+unsafe impl Send for JobHandle {}
+unsafe impl Sync for JobHandle {}
+
 pub struct ResourceController {
-    job_handle: Mutex<Option<HANDLE>>,
+    job_handle: Mutex<Option<JobHandle>>,
     config: Mutex<ResourceConfig>,
+    last_cpu_sample: Mutex<Option<CpuSample>>,
 }
 
 impl ResourceController {
@@ -24,6 +38,7 @@ impl ResourceController {
         Self {
             job_handle: Mutex::new(None),
             config: Mutex::new(Self::default_config()),
+            last_cpu_sample: Mutex::new(None),
         }
     }
 
@@ -74,7 +89,7 @@ impl ResourceController {
             let mut handle_guard = self.job_handle.lock().map_err(|e| {
                 BackendError::ResourceError(format!("Job handle mutex poisoned: {}", e))
             })?;
-            *handle_guard = Some(job);
+            *handle_guard = Some(JobHandle(job));
         }
 
         Ok(())
@@ -87,7 +102,7 @@ impl ResourceController {
             BackendError::ResourceError(format!("Job handle mutex poisoned: {}", e))
         })?;
 
-        if let Some(handle) = handle_guard.take() {
+        if let Some(JobHandle(handle)) = handle_guard.take() {
             unsafe {
                 CloseHandle(handle)
                     .map_err(|e| BackendError::ResourceError(format!("CloseHandle failed: {}", e)))?;
@@ -98,9 +113,8 @@ impl ResourceController {
     }
 
     /// 获取当前进程的资源使用率。
-    /// 
-    /// TODO: CPU 百分比计算需要前后两次采样或结合系统时间才能得出精确值，
-    /// 当前版本返回 0.0 作为占位值，后续可基于 `GetProcessTimes` 完善。
+    ///
+    /// CPU 百分比基于 `GetProcessTimes` 的前后两次采样计算，首次调用返回 0.0。
     pub fn current_usage(&self) -> Result<ResourceUsage, BackendError> {
         let memory_mb = unsafe {
             let process = GetCurrentProcess();
@@ -117,10 +131,60 @@ impl ResourceController {
             }
         };
 
+        let cpu_percent = unsafe {
+            let process = GetCurrentProcess();
+            let mut creation = FILETIME::default();
+            let mut exit = FILETIME::default();
+            let mut kernel = FILETIME::default();
+            let mut user = FILETIME::default();
+
+            match GetProcessTimes(process, &mut creation, &mut exit, &mut kernel, &mut user) {
+                Ok(()) => {
+                    let process_time = Self::filetime_to_u64(kernel) + Self::filetime_to_u64(user);
+                    let now = Instant::now();
+
+                    let mut sample_guard = self.last_cpu_sample.lock().map_err(|e| {
+                        BackendError::ResourceError(format!("CPU sample mutex poisoned: {}", e))
+                    })?;
+
+                    let cpu = if let Some(last) = *sample_guard {
+                        let proc_delta = process_time.saturating_sub(last.process_time);
+                        let elapsed_ns = now.duration_since(last.timestamp).as_nanos() as u64;
+                        let elapsed_100ns = elapsed_ns / 100;
+
+                        if elapsed_100ns > 0 {
+                            let num_cpus = std::thread::available_parallelism()
+                                .map(|n| n.get() as f64)
+                                .unwrap_or(1.0);
+                            let raw = (proc_delta as f64 / elapsed_100ns as f64) * 100.0 / num_cpus;
+                            raw.clamp(0.0, 100.0) as f32
+                        } else {
+                            0.0
+                        }
+                    } else {
+                        0.0
+                    };
+
+                    *sample_guard = Some(CpuSample {
+                        process_time,
+                        timestamp: now,
+                    });
+
+                    cpu
+                }
+                Err(_) => 0.0,
+            }
+        };
+
         Ok(ResourceUsage {
-            cpu_percent: 0.0,
+            cpu_percent,
             memory_mb,
         })
+    }
+
+    /// 将 Windows FILETIME 转换为 u64（100 纳秒单位）
+    fn filetime_to_u64(ft: FILETIME) -> u64 {
+        ((ft.dwHighDateTime as u64) << 32) | (ft.dwLowDateTime as u64)
     }
 
     /// 返回当前生效的配置副本。

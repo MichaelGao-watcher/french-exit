@@ -60,7 +60,7 @@ pub trait Scanner: Send + Sync {
         &self,
         ctx: &ScanContext,
         pause_rx: &watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError>;
 }
 

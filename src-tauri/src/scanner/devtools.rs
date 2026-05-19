@@ -32,7 +32,7 @@ impl Scanner for DevToolsScanner {
         &self,
         _ctx: &ScanContext,
         _pause_rx: &watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut items = Vec::new();
         let total = 4;

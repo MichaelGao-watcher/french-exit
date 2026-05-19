@@ -49,16 +49,28 @@ pub async fn start_scan(
         temp_dir: std::env::temp_dir(),
     };
 
-    // 3. 调用 orchestrator 启动扫描
-    let scan_id = state.orchestrator.start_scan(ctx).map_err(|e| e.into())?;
+    // 3. 创建进度通道并注入 orchestrator
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel::<crate::types::ProgressEvent>(128);
+    state.orchestrator.set_progress_tx(progress_tx);
 
-    // 4. 推送扫描开始事件
+    // 4. 调用 orchestrator 启动扫描
+    let scan_id = state.orchestrator.start_scan(ctx)?;
+
+    // 5. 推送扫描开始事件
     let _ = app.emit(
         "scan_progress",
         crate::types::ProgressEvent::ScanStarted { total_scanners: 7 },
     );
 
-    // 5. 启动后台监控 task，轮询 orchestrator 状态并推送事件
+    // 6. 启动后台进度转发 task：将 scanner 细粒度进度实时推送到前端
+    let app_progress = app.clone();
+    tokio::spawn(async move {
+        while let Some(event) = progress_rx.recv().await {
+            let _ = app_progress.emit("scan_progress", event);
+        }
+    });
+
+    // 7. 启动后台监控 task，轮询 orchestrator 状态并推送事件
     let app_clone = app.clone();
     let orch = Arc::clone(&state.orchestrator);
     tokio::spawn(async move {
@@ -109,13 +121,13 @@ pub async fn start_scan(
 /// CMD-03: 暂停扫描
 #[tauri::command]
 pub async fn pause_scan(state: State<'_, AppState>) -> Result<(), FrontendError> {
-    state.orchestrator.pause_session().map_err(|e| e.into())
+    state.orchestrator.pause_session().map_err(FrontendError::from)
 }
 
 /// CMD-03: 恢复扫描
 #[tauri::command]
 pub async fn resume_scan(state: State<'_, AppState>) -> Result<(), FrontendError> {
-    state.orchestrator.resume_session().map_err(|e| e.into())
+    state.orchestrator.resume_session().map_err(FrontendError::from)
 }
 
 /// CMD-04: 获取扫描结果（分页）
@@ -197,7 +209,7 @@ pub async fn submit_decisions(
     state
         .orchestrator
         .submit_decisions(decisions)
-        .map_err(|e| e.into())
+        .map_err(FrontendError::from)
 }
 
 /// CMD-07: 开始执行（执行用户决策）
@@ -205,7 +217,7 @@ pub async fn submit_decisions(
 pub async fn start_execution(
     state: State<'_, AppState>,
 ) -> Result<ExecutionReport, FrontendError> {
-    state.orchestrator.execute_plan().map_err(|e| e.into())
+    state.orchestrator.execute_plan().map_err(FrontendError::from)
 }
 
 /// CMD-08: 获取资源配置
@@ -233,7 +245,7 @@ pub async fn set_resource_config(
     state
         .resource_controller
         .apply_limits(config)
-        .map_err(|e| e.into())
+        .map_err(FrontendError::from)
 }
 
 /// 获取当前会话状态
@@ -247,6 +259,7 @@ pub async fn get_session_state(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::Action;
 
     #[test]
     fn test_start_scan_date_validation() {

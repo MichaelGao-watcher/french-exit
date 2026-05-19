@@ -132,7 +132,7 @@ impl FileSystemScanner {
     fn scan_wechat(
         &self,
         ctx: &ScanContext,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut items = Vec::new();
         let wechat_dir = ctx.user_home.join("Documents").join("WeChat Files");
@@ -196,7 +196,7 @@ impl FileSystemScanner {
         &self,
         ctx: &ScanContext,
         dir: &Path,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut items = Vec::new();
 
@@ -306,7 +306,7 @@ impl Scanner for FileSystemScanner {
         &self,
         ctx: &ScanContext,
         _pause_rx: &tokio::sync::watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut all_items = Vec::new();
 

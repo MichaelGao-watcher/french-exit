@@ -116,7 +116,7 @@ impl Scanner for ChatScanner {
         &self,
         ctx: &ScanContext,
         _pause_rx: &tokio::sync::watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut items = Vec::new();
         let total_steps = 4;

@@ -74,7 +74,7 @@ impl ScannerRegistry {
         &self,
         ctx: &ScanContext,
         pause_rx: &watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, BackendError> {
         let indices: Vec<usize> = (0..self.scanners.len()).collect();
         self.scan_impl(&indices, ctx, pause_rx, progress).await
@@ -86,7 +86,7 @@ impl ScannerRegistry {
         category: TraceCategory,
         ctx: &ScanContext,
         pause_rx: &watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, BackendError> {
         let indices: Vec<usize> = self
             .scanners
@@ -107,7 +107,7 @@ impl ScannerRegistry {
         indices: &[usize],
         ctx: &ScanContext,
         pause_rx: &watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, BackendError> {
         if indices.is_empty() {
             return Ok(Vec::new());
@@ -158,7 +158,7 @@ impl ScannerRegistry {
                 }
                 res = join_set.join_next() => {
                     match res {
-                        Some(Ok((id, Ok(items)))) => {
+                        Some(Ok((_id, Ok(items)))) => {
                             all_items.extend(items);
                         }
                         Some(Ok((id, Err(e)))) => {
@@ -267,7 +267,7 @@ mod tests {
             &self,
             _ctx: &ScanContext,
             pause_rx: &watch::Receiver<bool>,
-            progress: &dyn Fn(ScanProgress),
+            progress: &(dyn Fn(ScanProgress) + Send + Sync),
         ) -> Result<Vec<TraceItem>, ScanError> {
             // 处理暂停信号：若处于暂停状态则短暂等待
             if *pause_rx.borrow() {

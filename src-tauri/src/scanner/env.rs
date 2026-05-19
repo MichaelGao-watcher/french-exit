@@ -71,7 +71,7 @@ impl Scanner for EnvVarScanner {
         &self,
         _ctx: &ScanContext,
         _pause_rx: &watch::Receiver<bool>,
-        progress: &dyn Fn(ScanProgress),
+        progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let vars: Vec<(String, String)> = std::env::vars().collect();
         let total = vars.len();
