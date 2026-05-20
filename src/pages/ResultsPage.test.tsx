@@ -16,8 +16,8 @@ import { getScanResults } from "../api/commands";
 const mockGetScanResults = vi.mocked(getScanResults);
 
 function makeItem(overrides: Partial<TraceItem> = {}): TraceItem {
+  const id = `item-${overrides.id || "1"}`;
   return {
-    id: `item-${overrides.id || "1"}`,
     category: "FileSystem",
     scanner_id: "test",
     name: "test.txt",
@@ -28,6 +28,7 @@ function makeItem(overrides: Partial<TraceItem> = {}): TraceItem {
     risk_note: null,
     suggested_action: "Delete",
     ...overrides,
+    id,
   };
 }
 

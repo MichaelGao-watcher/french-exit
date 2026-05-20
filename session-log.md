@@ -147,3 +147,33 @@
 
 **遗留问题 / 下轮开始点**：
 - 无
+
+---
+
+### 2026-05-20 12:35-12:45
+
+**目标**：完成 P4 可选扩展：前端 vitest 覆盖率提升 + E2E 边界场景扩展
+
+**实际完成**：
+- ✅ 前端 vitest 从 23 测提升到 42 测
+  - 新增 `InputPage.test.tsx`（5 测：渲染、按钮禁用、日期选择、成功扫描、失败错误）
+  - 新增 `ConfirmPage.test.tsx`（5 测：分组渲染、空操作错误、二次确认弹窗、取消弹窗、返回修改）
+  - 新增 `ExecutingPage.test.tsx`（4 测：加载状态、成功跳转、失败回退、只执行一次）
+  - 新增 `ReportPage.test.tsx`（5 测：空状态、统计卡片、打包路径显示/隐藏、重启按钮）
+  - 修改 `AppContext.tsx`：导出 `AppContext`、`initialState`、`appReducer`、`TestAppProvider`
+  - 修复 `ResultsPage.test.tsx` 和 `ConfirmPage.test.tsx` 中 `makeItem` 的 id 生成 bug
+- ✅ E2E 从 11 测提升到 16 测
+  - 新增 `boundary-flows.spec.ts`（5 测：深色模式切换、重置流程、空扫描结果、扫描失败、取消扫描）
+- ✅ 更新 `AGENTS.md` §3.6：新增第 5 步「AI 综合分析，给出建议」
+- ✅ 更新 `status.md`、`lessons-learned.md`
+
+**关键决策**：
+- 对 ConfirmPage/ReportPage 等直接从 Context 读取的组件，选择 mock `useAppState` 而非构建 TestProvider。理由是这些组件内部 dispatch 后会触发 reducer 状态变化（如 RESET），mock 方式可避免测试中组件意外切换视图。
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：ConfirmPage 测试始终无法找到 DOM 元素，DOM 输出显示分组列表未渲染 → 排查 1 小时，通过逐层添加 Inspector 组件 + console.log，最终发现 `makeItem` 工厂函数中 `...overrides` 在模板字符串属性之后，导致 `id` 被覆盖为原始值（`"1"` 而非 `"item-1"`），与 decisions Map 的 key 不匹配 → 修复：将计算属性 `id` 移到 `...overrides` 之后
+- **阻碍**：ReportPage 测试中 `getByText("10")` 匹配到 2 个元素（统计卡片 + 摘要文案）→ 改用 `getAllByText` 并验证长度
+- **阻碍**：空扫描结果测试中假设"下一步"按钮应隐藏，实际 ResultsPage 始终显示 → 移除该断言
+
+**遗留问题 / 下轮开始点**：
+- P4 仅剩后端 Rust `#[test]` 补充，或用户给出新指令

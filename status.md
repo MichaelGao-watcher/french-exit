@@ -26,9 +26,9 @@ P2 ✅ | P3 vitest ✅ | P3 Playwright E2E ✅ | **P1 UCRT ✅ 已修复**
   - 额外修复：`scanner/registry_sys.rs` 测试中身份证号长度错误（15 位 → 18 位）
 
 ### P4 — 可选扩展
-- [ ] 前端 vitest 覆盖率提升（当前仅 ResultsPage / ScanPage / AppContext）
-- [ ] 后端 Rust `#[test]` 补充（需先解决 P1）
-- [ ] E2E 扩展：深色模式、重置流程等
+- [x] 前端 vitest 覆盖率提升（42 测：AppContext 11 + ScanPage 4 + ResultsPage 8 + InputPage 5 + ConfirmPage 5 + ExecutingPage 4 + ReportPage 5）
+- [x] E2E 扩展：深色模式、重置流程、空结果、扫描失败、取消扫描（16 测）
+- [ ] 后端 Rust `#[test]` 补充（P1 已修复，待补充）
 
 ---
 
@@ -56,8 +56,8 @@ cargo test --no-run     # ✅ 通过
 cargo test --lib        # ⚠️ 0xc0000139（P1 待修复）
 
 # 测试
-npm run test:run          # vitest 23 测
-npx playwright test e2e/  # E2E 11 测
+npm run test:run          # vitest 42 测
+npx playwright test e2e/  # E2E 16 测
 ```
 
 ---
@@ -93,9 +93,10 @@ src/
 ```
 e2e/
 ├── fixtures.ts              # Playwright fixture + setupStandardMock
-├── full-flow.spec.ts        # 完整流程 E2E
-├── results-interactions.spec.ts  # ResultsPage 交互 E2E
-├── error-boundary.spec.ts   # 错误边界 E2E
+├── full-flow.spec.ts        # 完整流程 E2E（3 测）
+├── results-interactions.spec.ts  # ResultsPage 交互 E2E（4 测）
+├── error-boundary.spec.ts   # 错误边界 E2E（4 测）
+├── boundary-flows.spec.ts   # 边界流程 E2E（5 测）
 └── tauri-mock.js            # 浏览器端 IPC mock 运行时
 ```
 
@@ -115,6 +116,7 @@ e2e/
 |------|------|
 | 2026-05-19 | P2/P3 全部完成；Playwright E2E 11 测通过；P1 UCRT 已修复（`cargo test --lib` 88 测全绿）；status 合并为唯一入口 |
 | 2026-05-20 | 从 vibe-coding-project-sop 同步采纳 SOP 更新：存档/恢复指令体系、各文档存档提示、lessons-learned「何时记录」规范；修正 AGENTS.md 触发词「存储」→「存档」 |
+| 2026-05-20 | 前端 vitest 从 23 测提升到 42 测（新增 InputPage/ConfirmPage/ExecutingPage/ReportPage）；E2E 从 11 测提升到 16 测（新增 boundary-flows：深色模式、重置、空结果、扫描失败、取消扫描） |
 
 ---
 

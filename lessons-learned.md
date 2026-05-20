@@ -141,4 +141,47 @@
 
 *新增假设时直接追加到上方列表。验证后勾选并迁移到对应经验区或删除。*
 
-*最后更新：2026-05-19*
+### 测试：mock useAppState 替代 TestProvider
+
+当组件直接从 Context state 读取（不调用 API）时，mock `useAppState` 比构建 TestProvider 更可控。尤其当组件内部 dispatch 后会触发 reducer 状态变化（如 RESET 回到初始状态），使用 mock 可以避免组件在测试中途意外卸载或切换视图。
+
+```tsx
+vi.mock("../store/AppContext", async () => {
+  const actual = await vi.importActual<typeof import("../store/AppContext")>(
+    "../store/AppContext"
+  );
+  return { ...actual, useAppState: vi.fn() };
+});
+```
+
+### 测试：工厂函数中计算属性要放在 `...overrides` 之后
+
+```tsx
+// ❌ 错误：overrides.id 会覆盖模板字符串结果
+function makeItem(overrides) {
+  return {
+    id: `item-${overrides.id || "1"}`,
+    ...overrides,  // ← 这里会把 id 又覆盖回 "1"
+  };
+}
+
+// ✅ 正确：计算属性放在最后
+function makeItem(overrides) {
+  const id = `item-${overrides.id || "1"}`;
+  return {
+    ...overrides,
+    id,
+  };
+}
+```
+
+### E2E：Playwright 模拟系统主题色
+
+```ts
+await page.emulateMedia({ colorScheme: "dark" });
+await expect(page.locator("html")).toHaveClass(/dark/);
+```
+
+---
+
+*最后更新：2026-05-20*

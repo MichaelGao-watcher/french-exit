@@ -56,7 +56,7 @@ type AppAction =
   | { type: "RESET" };
 
 /** 初始状态 */
-const initialState: AppState = {
+export const initialState: AppState = {
   page: "input",
   startDate: "",
   scanId: null,
@@ -75,7 +75,7 @@ const initialState: AppState = {
 /**
  * Reducer：纯函数，根据 action 类型更新状态
  */
-function appReducer(state: AppState, action: AppAction): AppState {
+export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "SET_PAGE":
       // 切换页面时自动清空错误提示
@@ -129,7 +129,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 }
 
 /** Context 类型 */
-const AppContext = createContext<{
+export const AppContext = createContext<{
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
 } | null>(null);
@@ -140,6 +140,26 @@ const AppContext = createContext<{
  */
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  return (
+    <AppContext.Provider value={{ state, dispatch }}>
+      {children}
+    </AppContext.Provider>
+  );
+}
+
+/**
+ * 测试专用 Provider，支持注入初始状态
+ * 仅在测试文件中使用
+ */
+export function TestAppProvider({
+  children,
+  initialState: override = {},
+}: {
+  children: ReactNode;
+  initialState?: Partial<AppState>;
+}) {
+  const merged: AppState = { ...initialState, ...override };
+  const [state, dispatch] = useReducer(appReducer, merged);
   return (
     <AppContext.Provider value={{ state, dispatch }}>
       {children}
