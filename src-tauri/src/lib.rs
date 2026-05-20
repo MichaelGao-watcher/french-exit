@@ -7,12 +7,17 @@ pub mod resource;
 pub mod scanner;
 pub mod store;
 pub mod types;
+pub mod webview2_fallback;
 
+#[cfg(not(test))]
 use commands::AppState;
 use std::sync::Arc;
 
+#[cfg(not(test))]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 在 Tauri 初始化前检测 EdgeCore 作为 WebView2 回退
+    webview2_fallback::try_setup_webview2_fallback();
     // ------------------------------------------------------------------
     // 1. 初始化 ScannerRegistry，注册所有扫描器
     // ------------------------------------------------------------------
@@ -93,6 +98,7 @@ pub fn run() {
             commands::get_resource_config,
             commands::set_resource_config,
             commands::get_session_state,
+            commands::open_path,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

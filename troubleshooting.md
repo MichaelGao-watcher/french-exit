@@ -32,13 +32,37 @@
 
 | | 内容 |
 |---|---|
-| **状态** | ⚠️ 已知未修复 |
+| **状态** | ✅ 已修复 |
 | **现象** | 测试编译通过，但运行时弹窗或报错 `STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139)` |
-| **原因** | `x86_64-pc-windows-gnu` toolchain 与 Windows 10 (19041) 存在已知兼容性 issue，非单纯 DLL 缺失 |
-| **解决** | 1. 更新 Windows Update / 安装最新 VC++ 2015-2022 Redistributable<br>2. 或升级 MinGW-w64 到最新版<br>3. 或切换 Rust 默认 toolchain 为 `x86_64-pc-windows-msvc`（需配置 MSVC linker） |
-| **验证** | `cargo test --no-run` 可通过（仅编译），`cargo test --lib` 需要运行时才报错 |
+| **原因** | `tauri::AppHandle` 出现在 `async fn` 签名中，与 MinGW UCRT 生成不兼容的 PE 导入表 |
+| **解决** | 将含 `AppHandle` 的 async command 函数拆分到 `commands/handlers.rs`，在 `#[cfg(not(test))]` 下条件编译；`lib.rs` 的 `run()` 同样条件编译。测试模式下不链接这些函数，从而绕过 loader 入口点缺失问题 |
+| **验证** | `cargo test --lib` 103 测全绿 |
 
 ---
+
+### 运行 `french-exit.exe` 报错：`Could not find the WebView2 Runtime`
+
+| | 内容 |
+|---|---|
+| **现象** | 双击 `.exe` 弹窗提示找不到 WebView2 Runtime |
+| **原因** | 系统未安装 WebView2 Runtime（某些重装系统或企业阉割镜像） |
+| **解决** | 从 NuGet 包 `Microsoft.Web.WebView2` 提取 `WebView2Loader.dll`，配置 `tauri.conf.json` 的 `bundle.resources` 自动打包到 `.exe` 同目录；同时程序启动时自动检测系统 EdgeCore 作为 WebView2 内核回退 |
+
+### 运行 `french-exit.exe` 报错：`找不到 WebView2Loader.dll`
+
+| | 内容 |
+|---|---|
+| **现象** | 双击 `.exe` 弹窗提示 `由于找不到 WebView2Loader.dll，无法继续执行代码` |
+| **原因** | 系统有 EdgeCore（Edge 浏览器内核）但缺少 WebView2 Runtime 的加载入口 DLL |
+| **解决** | 将 `WebView2Loader.dll`（可从 NuGet 提取）与 `.exe` 一起分发。Tauri `bundle.resources` 会自动将其复制到输出目录 |
+
+### `cargo tauri build` 失败：`另一个程序正在使用此文件` (os error 32)
+
+| | 内容 |
+|---|---|
+| **现象** | `cargo tauri build` 报错，提示无法访问 `french-exit.exe` 或 `target/release/` 下的文件 |
+| **原因** | `french-exit.exe` 仍在后台运行，锁定了构建产物 |
+| **解决** | `taskkill //F //IM french-exit.exe` 强制结束进程后再构建 |
 
 ## 测试错误
 

@@ -90,6 +90,14 @@ export async function setResourceConfig(config: ResourceConfig): Promise<void> {
 }
 
 /**
+ * 打开文件所在文件夹（使用 Windows 资源管理器）
+ * @param path 文件完整路径
+ */
+export async function openPath(path: string): Promise<void> {
+  return invoke("open_path", { path });
+}
+
+/**
  * 监听扫描进度事件（Tauri Event，替代轮询）
  * @param handler 进度事件处理函数
  * @returns 取消监听的函数

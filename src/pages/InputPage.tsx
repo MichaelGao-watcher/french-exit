@@ -7,18 +7,27 @@
 import { useState, useCallback } from "react";
 import { useAppState } from "../store/AppContext";
 import { startScan } from "../api/commands";
+import { DatePicker } from "../components/DatePicker";
+
+/** 将用户选择的局部日期补全为 YYYY-MM-DD，供后端使用 */
+function normalizeDate(dateStr: string): string {
+  if (!dateStr) return "";
+  if (/^\d{4}$/.test(dateStr)) return `${dateStr}-01-01`;
+  if (/^\d{4}-\d{2}$/.test(dateStr)) return `${dateStr}-01`;
+  return dateStr;
+}
 
 export function InputPage() {
   const { state, dispatch } = useAppState();
   const [isLoading, setIsLoading] = useState(false);
 
-  /** 今天的日期，用于限制日期选择器的最大值 */
-  const today = new Date().toISOString().split("T")[0];
+  /** 今天的日期字符串（YYYY-MM-DD），用于代码级校验 */
+  const todayStr = new Date().toISOString().split("T")[0];
 
   /** 日期输入变化 */
   const handleDateChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      dispatch({ type: "SET_START_DATE", payload: e.target.value });
+    (date: string) => {
+      dispatch({ type: "SET_START_DATE", payload: date });
       if (state.error) {
         dispatch({ type: "SET_ERROR", payload: null });
       }
@@ -26,18 +35,36 @@ export function InputPage() {
     [dispatch, state.error],
   );
 
+  /** 校验日期是否合法（非空） */
+  const validateDate = (dateStr: string): string | null => {
+    if (!dateStr) {
+      return "请选择时间";
+    }
+    // UI 层面已完全阻止未来日期选择，此处保留兜底
+    const fullDate = normalizeDate(dateStr);
+    const inputDate = new Date(fullDate + "T00:00:00");
+    const today = new Date(todayStr + "T00:00:00");
+    if (inputDate.getTime() > today.getTime()) {
+      return "时间不能是未来日期";
+    }
+    return null;
+  };
+
   /** 点击开始扫描 */
   const handleStart = useCallback(async () => {
-    if (!state.startDate) {
-      dispatch({ type: "SET_ERROR", payload: "请选择入职日期" });
+    const error = validateDate(state.startDate);
+    if (error) {
+      dispatch({ type: "SET_ERROR", payload: error });
       return;
     }
 
     setIsLoading(true);
     dispatch({ type: "SET_ERROR", payload: null });
 
+    const normalized = normalizeDate(state.startDate);
+
     try {
-      const scanId = await startScan(state.startDate);
+      const scanId = await startScan(normalized);
       dispatch({ type: "SET_SCAN_ID", payload: scanId });
       dispatch({ type: "SET_SCANNING", payload: true });
       dispatch({ type: "SET_PAGE", payload: "scanning" });
@@ -48,7 +75,7 @@ export function InputPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [state.startDate, dispatch]);
+  }, [state.startDate, dispatch, todayStr]);
 
   const canStart = Boolean(state.startDate) && !isLoading;
 
@@ -61,7 +88,7 @@ export function InputPage() {
             French Exit
           </h1>
           <p className="text-lg text-muted-foreground">
-            离职前，优雅地清理个人痕迹
+            在撤离公用电脑前，安全处理您留下的痕迹
           </p>
         </div>
 
@@ -69,45 +96,14 @@ export function InputPage() {
         <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-md p-8 shadow-sm">
           {/* 日期输入 */}
           <div className="mb-6">
-            <label
-              htmlFor="start-date"
-              className="block text-sm font-medium text-foreground mb-2"
-            >
-              你的入职日期
-            </label>
-            <input
-              id="start-date"
-              type="date"
+            <DatePicker
+              label="你开始使用这台电脑的时间"
               value={state.startDate}
               onChange={handleDateChange}
-              max={today}
-              className="w-full rounded-xl border border-input bg-white/50 dark:bg-black/30 
-                         px-4 py-3 text-foreground outline-none
-                         focus:ring-2 focus:ring-ring focus:border-transparent
-                         transition-colors duration-200"
+              placeholder="请选择时间"
             />
             <p className="mt-1.5 text-xs text-muted-foreground">
-              系统将扫描该日期之后产生的个人文件与痕迹
-            </p>
-          </div>
-
-          {/* CPU 限制说明 */}
-          <div className="mb-8 flex items-start gap-2">
-            <svg
-              className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              程序默认限制 CPU 使用率 ≤30%，保证办公不卡顿
+              系统将扫描该时间之后产生的个人文件与痕迹
             </p>
           </div>
 

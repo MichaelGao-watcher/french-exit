@@ -72,3 +72,37 @@ pub mod chat;
 pub mod registry_sys;
 pub mod system;
 pub mod devtools;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scan_error_display_variants() {
+        assert_eq!(
+            format!("{}", ScanError::InvalidPath("/bad".to_string())),
+            "无效路径: /bad"
+        );
+        assert_eq!(
+            format!("{}", ScanError::PermissionDenied("denied".to_string())),
+            "权限拒绝: denied"
+        );
+        assert_eq!(
+            format!("{}", ScanError::Unsupported("unsupported".to_string())),
+            "不支持: unsupported"
+        );
+        assert_eq!(
+            format!("{}", ScanError::Internal("internal".to_string())),
+            "内部错误: internal"
+        );
+        assert_eq!(format!("{}", ScanError::Interrupted), "扫描被中断");
+    }
+
+    #[test]
+    fn test_scan_error_from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "missing");
+        let scan_err: ScanError = io_err.into();
+        assert!(matches!(scan_err, ScanError::IoError(_)));
+        assert_eq!(format!("{}", scan_err), "IO错误: missing");
+    }
+}

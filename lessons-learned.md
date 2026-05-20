@@ -182,6 +182,24 @@ await page.emulateMedia({ colorScheme: "dark" });
 await expect(page.locator("html")).toHaveClass(/dark/);
 ```
 
+### Tauri 零依赖分发：WebView2Loader.dll 提取与打包
+
+```bash
+# 从 NuGet 提取 WebView2Loader.dll（微软官方允许随应用分发）
+curl -L -o webview2.nupkg "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/"
+unzip -o webview2.nupkg "build/native/x64/WebView2Loader.dll" -d ./extracted/
+# 复制到 src-tauri/，并在 tauri.conf.json 中配置 bundle.resources
+```
+
+配合 EdgeCore 回退检测（`WEBVIEW2_BROWSER_EXECUTABLE_FOLDER`），可在不安装 WebView2 Runtime 的系统上直接运行 Tauri 应用。
+
+### 自定义日期选择器：不引入第三方库
+
+本项目自建 `DatePicker` 组件（年/月/日三精度，丝滑下拉面板，Apple Design），比引入 `react-datepicker` 或 `date-fns` 更轻量，且完全符合设计系统。关键实现：
+- `useRef` + `mousedown` 监听实现点击外部关闭
+- CSS `@keyframes dropdownIn` 实现淡入+位移动画
+- 年月日联动限制（如今年只显示到当前月）
+
 ---
 
 *最后更新：2026-05-20*

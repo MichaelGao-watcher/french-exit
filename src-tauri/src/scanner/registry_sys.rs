@@ -298,7 +298,7 @@ mod tests {
         // 验证启发式推断对可疑内容返回 true
         assert!(looks_like_personal_info("user_email", "test@example.com"));
         assert!(looks_like_personal_info("phone_number", "13800138000"));
-        assert!(looks_like_personal_info("id_card", "11010119900101x"));
+        assert!(looks_like_personal_info("id_card", "11010119900101123x"));
         assert!(looks_like_personal_info("company_name", "Acme Corp"));
 
         // 验证普通内容返回 false

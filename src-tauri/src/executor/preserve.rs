@@ -25,3 +25,39 @@ impl Executor for PreserveExecutor {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ExecutionStatus, TraceCategory};
+
+    #[test]
+    fn test_preserve_executor_new() {
+        let executor = PreserveExecutor::new();
+        // PreserveExecutor 是零大小类型，只需确认能构造
+        let _ = executor;
+    }
+
+    #[test]
+    fn test_preserve_executor_execute() {
+        let executor = PreserveExecutor::new();
+        let item = TraceItem {
+            id: "item-1".to_string(),
+            category: TraceCategory::FileSystem,
+            scanner_id: "scanner-fs".to_string(),
+            name: "工作文件.txt".to_string(),
+            path: None,
+            size_bytes: Some(1024),
+            modified_at: None,
+            inferred: false,
+            risk_note: None,
+            suggested_action: Some(Action::Preserve),
+        };
+
+        let result = executor.execute(&item).unwrap();
+        assert_eq!(result.item_id, "item-1");
+        assert_eq!(result.action, Action::Preserve);
+        assert!(matches!(result.status, ExecutionStatus::Success));
+        assert_eq!(result.detail, Some("用户选择保留".to_string()));
+    }
+}

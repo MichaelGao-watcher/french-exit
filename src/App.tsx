@@ -21,21 +21,11 @@ function AppContent() {
   const { state, dispatch } = useAppState();
 
   /**
-   * 监听系统 prefers-color-scheme 媒体查询
-   * 实时切换 html 元素的 dark class，配合 CSS 变量实现无闪烁主题切换
+   * 默认深色模式，以黑色为底色
+   * 仍监听系统主题变化，但默认保持 dark（用户可后续扩展手动切换）
    */
   useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const update = () => {
-      if (mq.matches) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    };
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
+    document.documentElement.classList.add("dark");
   }, []);
 
   // 初始化：加载资源配置

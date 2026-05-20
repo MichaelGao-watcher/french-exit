@@ -33,6 +33,86 @@ pub enum BackendError {
     IoError(#[from] std::io::Error),
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_backend_error_display_variants() {
+        assert_eq!(
+            format!("{}", BackendError::ScanError("foo".to_string())),
+            "扫描错误: foo"
+        );
+        assert_eq!(
+            format!("{}", BackendError::ExecutionError("bar".to_string())),
+            "执行错误: bar"
+        );
+        assert_eq!(
+            format!("{}", BackendError::EraseError("baz".to_string())),
+            "擦除错误: baz"
+        );
+        assert_eq!(
+            format!("{}", BackendError::ResourceError("qux".to_string())),
+            "资源控制错误: qux"
+        );
+        assert_eq!(
+            format!("{}", BackendError::OrchestratorError("quux".to_string())),
+            "流程调度错误: quux"
+        );
+        assert_eq!(
+            format!("{}", BackendError::StoreError("corge".to_string())),
+            "存储错误: corge"
+        );
+    }
+
+    #[test]
+    fn test_backend_error_from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let backend_err: BackendError = io_err.into();
+        assert!(matches!(backend_err, BackendError::IoError(_)));
+        assert_eq!(format!("{}", backend_err), "IO错误: file not found");
+    }
+
+    #[test]
+    fn test_backend_to_frontend_error_mapping() {
+        let fe: FrontendError = BackendError::ScanError("scan failed".to_string()).into();
+        assert_eq!(fe.code, "SCAN_ERROR");
+        assert_eq!(fe.message, "scan failed");
+
+        let fe: FrontendError = BackendError::ExecutionError("exec failed".to_string()).into();
+        assert_eq!(fe.code, "EXECUTION_ERROR");
+        assert_eq!(fe.message, "exec failed");
+
+        let fe: FrontendError = BackendError::EraseError("erase failed".to_string()).into();
+        assert_eq!(fe.code, "ERASE_ERROR");
+
+        let fe: FrontendError = BackendError::ResourceError("resource failed".to_string()).into();
+        assert_eq!(fe.code, "RESOURCE_ERROR");
+
+        let fe: FrontendError = BackendError::OrchestratorError("orch failed".to_string()).into();
+        assert_eq!(fe.code, "ORCHESTRATOR_ERROR");
+
+        let fe: FrontendError = BackendError::StoreError("store failed".to_string()).into();
+        assert_eq!(fe.code, "STORE_ERROR");
+
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "io failed");
+        let fe: FrontendError = BackendError::IoError(io_err).into();
+        assert_eq!(fe.code, "IO_ERROR");
+        assert_eq!(fe.message, "io failed");
+    }
+
+    #[test]
+    fn test_frontend_error_serialize() {
+        let err = FrontendError {
+            code: "TEST".to_string(),
+            message: "hello".to_string(),
+        };
+        let json = serde_json::to_string(&err).unwrap();
+        assert!(json.contains("\"code\":\"TEST\""));
+        assert!(json.contains("\"message\":\"hello\""));
+    }
+}
+
 impl From<BackendError> for FrontendError {
     fn from(err: BackendError) -> Self {
         match err {

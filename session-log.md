@@ -110,6 +110,38 @@
 
 ---
 
+### 2026-05-20 13:22-14:00
+
+**目标**：补充后端 Rust `#[test]` 单元测试（P4 最后一项）
+
+**实际完成**：
+- ✅ 修复 P1 UCRT 运行时问题（0xc0000139）
+  - 创建 `commands/handlers.rs`，将含 `AppHandle` 的 async command 函数拆出
+  - `commands/mod.rs` 在 `#[cfg(not(test))]` 下编译 handlers 模块
+  - `lib.rs` 的 `run()` 添加 `#[cfg(not(test))]`
+  - 修复 `scanner/registry_sys.rs` 测试中断言值长度错误（15 位 → 18 位）
+- ✅ 后端 Rust 测试从 88 测提升到 103 测
+  - `error.rs`：新增 4 测（BackendError Display、From IoError、→FrontendError 映射、FrontendError Serialize）
+  - `executor/preserve.rs`：新增 2 测（new、execute 返回正确结果）
+  - `scanner/mod.rs`：新增 2 测（ScanError Display、From IoError）
+  - `orchestrator/mod.rs`：新增 7 测（initial_state、transition_to_invalid、pause/resume_invalid_state、submit_decisions_from_scanned/invalid_state、execute_plan_invalid_state）
+- ✅ `cargo test --lib` 103 测全绿
+- ✅ 更新 `status.md`
+
+**关键决策**：
+- 发现 status.md 记录 "P1 UCRT 已修复" 与实际代码不符（代码中无 `#[cfg(not(test))]`）。选择先修复 P1 再补充测试，否则无法验证新增测试。
+- orchestrator 测试策略：构造真实依赖对象（空 ScannerRegistry + TempStore），只测状态机流转和非法状态拦截，不测涉及 IO/浏览器的 execute_plan 成功路径。
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：`cargo test --lib` 仍报 0xc0000139 → 根因：status.md 记录的修复方案未实际落地到代码 → 解决：按方案拆分 handlers.rs + 条件编译
+- **阻碍**：`scanner/registry_sys.rs` 测试中 `looks_like_personal_info("id_card", "11010119900101x")` 失败 → 根因：值只有 15 位，`is_likely_id_card` 要求 18 位 → 解决：将测试值改为 18 位 `"11010119900101123x"`
+- **阻碍**：orchestrator `test_submit_decisions_from_scanned` 中直接 `Idle → Scanned` 转换 panic → 根因：`is_valid_transition` 不允许该转换 → 解决：改为 `Idle → Scanning → Scanned` 合法路径
+
+**遗留问题 / 下轮开始点**：
+- P4 全部完成。如用户无新指令，项目核心功能与测试体系均已完备。
+
+---
+
 ## 存档检查清单（AI 执行「存储」指令时使用）
 
 ```markdown
@@ -175,5 +207,33 @@
 - **阻碍**：ReportPage 测试中 `getByText("10")` 匹配到 2 个元素（统计卡片 + 摘要文案）→ 改用 `getAllByText` 并验证长度
 - **阻碍**：空扫描结果测试中假设"下一步"按钮应隐藏，实际 ResultsPage 始终显示 → 移除该断言
 
+---
+
+### 2026-05-20 13:22-15:37
+
+**目标**：补充后端 Rust 测试 + 打包 release 供用户试跑 + UI/UX 迭代
+
+**实际完成**：
+- ✅ P1 UCRT 实际修复（拆分 commands/handlers.rs + lib.rs `#[cfg(not(test))]`）
+- ✅ 后端 Rust 测试从 88 测提升到 103 测
+- ✅ 构建 release 并解决 WebView2 依赖（NuGet 提取 WebView2Loader.dll + EdgeCore 回退）
+- ✅ 自定义 DatePicker 组件（年/月/日三精度，丝滑下拉面板，Apple Design）
+- ✅ 未来日期在 UI 层面完全不可选（年份/月份/日期三级动态限制）
+- ✅ 全局默认 dark 主题（移除系统自动切换）
+- ✅ ResultsPage 显示修改时间 + "打开"按钮（调用 explorer 打开所在文件夹）
+- ✅ 工作区整理：release/ 目录（french-exit.exe + WebView2Loader.dll）
+- ✅ 更新 troubleshooting.md、lessons-learned.md、decisions.md、status.md
+
+**关键决策**：
+- **WebView2 分发策略**：放弃 NSIS bootstrapper（实际测试静默安装失败，需管理员权限），改用从 NuGet 提取 WebView2Loader.dll 并打包到 .exe 同目录 + 程序启动时自动检测 EdgeCore。实现真正零额外安装。
+- **默认 dark 主题**：用户明确要求黑色底色，移除 `prefers-color-scheme` 自动切换，简化实现。
+- **自建 DatePicker**：不引入第三方日期库，完全自建。理由：体量小、设计系统完全可控、无额外依赖。
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：`cargo test --lib` 仍报 0xc0000139 → 根因：status.md 记录"已修复"但实际代码无 `#[cfg(not(test))]` → 按方案拆分 handlers.rs + 条件编译
+- **阻碍**：`WebView2Loader.dll` 缺失 → 根因：系统有 EdgeCore 但无 WebView2 Runtime → 解决：从 `Microsoft.Web.WebView2` NuGet 包提取合法 DLL，配置 `bundle.resources` 自动打包
+- **阻碍**：构建时频繁报 "另一个程序正在使用此文件" → 根因：`french-exit.exe` 后台锁定产物 → 解决：`taskkill //F //IM french-exit.exe` 清理后重试
+- **阻碍**：DatePicker 测试中原生 `<select>` 查询不稳定 → 解决：全部替换为自定义按钮+下拉面板，测试改用 `getByRole("button")` 点击交互
+
 **遗留问题 / 下轮开始点**：
-- P4 仅剩后端 Rust `#[test]` 补充，或用户给出新指令
+- 项目核心功能与测试体系已完备，产物已整理到 `release/` 目录，可直接上传分发

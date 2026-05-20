@@ -606,4 +606,106 @@ mod tests {
             &SessionState::Idle
         ));
     }
+
+    #[test]
+    fn test_orchestrator_initial_state() {
+        let orch = create_test_orchestrator();
+        assert!(matches!(orch.current_state(), SessionState::Idle));
+    }
+
+    #[test]
+    fn test_transition_to_invalid() {
+        let orch = create_test_orchestrator();
+        // Idle → Executing 是非法转换
+        let result = orch.transition_to(SessionState::Executing);
+        assert!(result.is_err());
+        assert!(matches!(orch.current_state(), SessionState::Idle));
+    }
+
+    #[test]
+    fn test_pause_session_invalid_state() {
+        let orch = create_test_orchestrator();
+        // Idle 状态下无法暂停
+        let result = orch.pause_session();
+        assert!(result.is_err());
+        assert!(matches!(orch.current_state(), SessionState::Idle));
+    }
+
+    #[test]
+    fn test_resume_session_invalid_state() {
+        let orch = create_test_orchestrator();
+        // Idle 状态下无法恢复
+        let result = orch.resume_session();
+        assert!(result.is_err());
+        assert!(matches!(orch.current_state(), SessionState::Idle));
+    }
+
+    #[test]
+    fn test_submit_decisions_from_scanned() {
+        let orch = create_test_orchestrator();
+        // 合法路径：Idle → Scanning → Scanned
+        orch.transition_to(SessionState::Scanning {
+            scan_id: "test-1".to_string(),
+        })
+        .unwrap();
+        orch.transition_to(SessionState::Scanned { item_count: 3 })
+            .unwrap();
+
+        // 从 Scanned 提交决策应自动经过 Confirming → Executing
+        let decisions = vec![
+            Decision {
+                item_id: "a".to_string(),
+                action: Action::Delete,
+            },
+        ];
+        let result = orch.submit_decisions(decisions);
+        assert!(result.is_ok());
+        assert!(matches!(orch.current_state(), SessionState::Executing));
+    }
+
+    #[test]
+    fn test_submit_decisions_invalid_state() {
+        let orch = create_test_orchestrator();
+        // Idle 状态下无法提交决策
+        let decisions = vec![Decision {
+            item_id: "a".to_string(),
+            action: Action::Delete,
+        }];
+        let result = orch.submit_decisions(decisions);
+        assert!(result.is_err());
+        assert!(matches!(orch.current_state(), SessionState::Idle));
+    }
+
+    #[test]
+    fn test_execute_plan_invalid_state() {
+        let orch = create_test_orchestrator();
+        // Idle 状态下无法执行计划
+        let result = orch.execute_plan();
+        assert!(result.is_err());
+        assert!(matches!(orch.current_state(), SessionState::Idle));
+    }
+
+    /// 构造一个用于测试的 Orchestrator，使用真实依赖但空 ScannerRegistry
+    fn create_test_orchestrator() -> Orchestrator {
+        use crate::executor::secure_erase::DoDEraser;
+        use crate::scanner::registry::ScannerRegistry;
+        use std::path::PathBuf;
+
+        let scanner_registry = ScannerRegistry::new();
+        let temp_store = Arc::new(TempStore::new().unwrap());
+        let resource_controller = Arc::new(ResourceController::new());
+        let eraser = Arc::new(DoDEraser::default());
+        let delete_executor = crate::executor::delete::DeleteExecutor::new(eraser);
+        let pack_executor = crate::executor::pack::PackExecutor::new(PathBuf::from("."), None);
+        let preserve_executor = crate::executor::preserve::PreserveExecutor::new();
+
+        Orchestrator::new(
+            scanner_registry,
+            temp_store,
+            resource_controller,
+            delete_executor,
+            pack_executor,
+            preserve_executor,
+        )
+    }
 }

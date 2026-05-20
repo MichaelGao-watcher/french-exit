@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useAppState } from "../store/AppContext";
-import { getScanResults } from "../api/commands";
+import { getScanResults, openPath } from "../api/commands";
 import type { TraceCategory, TraceItem, Decision } from "../types";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -355,10 +355,19 @@ export function ResultsPage() {
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5 flex gap-3">
                   <span>{formatBytes(item.size_bytes)}</span>
-                  <span>{formatDate(item.modified_at)}</span>
+                  <span className="text-foreground/70">修改于 {formatDate(item.modified_at)}</span>
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-2">
+                {item.path && (
+                  <button
+                    onClick={() => openPath(item.path!)}
+                    className="px-2 py-1 text-xs rounded-lg bg-muted hover:bg-muted/80 transition"
+                    title="打开所在文件夹"
+                  >
+                    打开
+                  </button>
+                )}
                 {canPreview(item) && (
                   <button
                     onClick={() => handlePreview(item)}

@@ -12,7 +12,7 @@
 
 ## 当前阶段
 
-P2 ✅ | P3 vitest ✅ | P3 Playwright E2E ✅ | **P1 UCRT ✅ 已修复**
+P2 ✅ | P3 vitest ✅ | P3 Playwright E2E ✅ | P1 UCRT ✅ | P4 后端 Rust 测试 ✅ | **UI/UX 迭代 + 分发就绪 ✅**
 
 ---
 
@@ -26,9 +26,16 @@ P2 ✅ | P3 vitest ✅ | P3 Playwright E2E ✅ | **P1 UCRT ✅ 已修复**
   - 额外修复：`scanner/registry_sys.rs` 测试中身份证号长度错误（15 位 → 18 位）
 
 ### P4 — 可选扩展
-- [x] 前端 vitest 覆盖率提升（42 测：AppContext 11 + ScanPage 4 + ResultsPage 8 + InputPage 5 + ConfirmPage 5 + ExecutingPage 4 + ReportPage 5）
-- [x] E2E 扩展：深色模式、重置流程、空结果、扫描失败、取消扫描（16 测）
-- [ ] 后端 Rust `#[test]` 补充（P1 已修复，待补充）
+- [x] 前端 vitest 覆盖率提升（42 测）
+- [x] E2E 扩展（16 测）
+- [x] 后端 Rust `#[test]` 补充（88 → 103 测）
+
+### P5 — UI/UX 迭代 & 分发就绪
+- [x] 自定义 DatePicker（年/月/日精度，Apple Design，未来日期不可选）
+- [x] WebView2 零依赖方案（NuGet 提取 WebView2Loader.dll + EdgeCore 回退检测）
+- [x] 全局默认 dark 主题
+- [x] ResultsPage 显示修改时间 + 打开所在文件夹
+- [x] 工作区整理：release/ 目录（french-exit.exe + WebView2Loader.dll）
 
 ---
 
@@ -53,7 +60,11 @@ rm -rf /c/french-exit && cp -r "/e/工作文件/vs-code/french-exit" /c/french-e
 cd /c/french-exit/src-tauri && export CARGO_TARGET_DIR=/e/cargo-target
 cargo check --lib       # ✅ 通过
 cargo test --no-run     # ✅ 通过
-cargo test --lib        # ⚠️ 0xc0000139（P1 待修复）
+cargo test --lib        # ✅ 103 测全绿（P1 已修复）
+
+# Release 构建
+cargo tauri build       # 产物在 E:/cargo-target/release/french-exit.exe
+cp /e/cargo-target/release/french-exit.exe /e/cargo-target/release/WebView2Loader.dll "/e/工作文件/vs-code/french-exit/release/"  # 复制回工作区 release/
 
 # 测试
 npm run test:run          # vitest 42 测
@@ -117,6 +128,8 @@ e2e/
 | 2026-05-19 | P2/P3 全部完成；Playwright E2E 11 测通过；P1 UCRT 已修复（`cargo test --lib` 88 测全绿）；status 合并为唯一入口 |
 | 2026-05-20 | 从 vibe-coding-project-sop 同步采纳 SOP 更新：存档/恢复指令体系、各文档存档提示、lessons-learned「何时记录」规范；修正 AGENTS.md 触发词「存储」→「存档」 |
 | 2026-05-20 | 前端 vitest 从 23 测提升到 42 测（新增 InputPage/ConfirmPage/ExecutingPage/ReportPage）；E2E 从 11 测提升到 16 测（新增 boundary-flows：深色模式、重置、空结果、扫描失败、取消扫描） |
+| 2026-05-20 | P1 UCRT 实际修复（拆分 commands/handlers.rs + lib.rs `#[cfg(not(test))]`）；后端 Rust 测试从 88 测提升到 103 测（新增 error 4 + preserve 2 + scanner/mod 2 + orchestrator 7） |
+| 2026-05-20 | UI/UX 迭代：自定义 DatePicker（年/月/日精度，未来日期不可选，丝滑下拉面板）；WebView2 零依赖方案（NuGet 提取 WebView2Loader.dll + EdgeCore 回退）；全局默认 dark 主题；ResultsPage 修改时间 + 打开路径；工作区 release/ 目录整理 |
 
 ---
 
