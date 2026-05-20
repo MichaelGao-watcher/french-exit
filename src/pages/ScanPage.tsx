@@ -14,6 +14,13 @@ export function ScanPage() {
   const { state, dispatch } = useAppState();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
+  const progressPercentRef = useRef(state.progressPercent);
+  progressPercentRef.current = state.progressPercent;
+
+  // 进入扫描页时强制重置进度，避免第二次扫描残留上次进度
+  useEffect(() => {
+    dispatch({ type: "SET_PROGRESS", payload: { message: "准备扫描…", percent: 0 } });
+  }, [dispatch]);
 
   // 监听 Tauri Event 实时进度推送（替代轮询的主方案）
   useEffect(() => {
@@ -35,7 +42,7 @@ export function ScanPage() {
               percent:
                 event.total > 0
                   ? Math.round((event.current / event.total) * 100)
-                  : state.progressPercent,
+                  : progressPercentRef.current,
             },
           });
           break;
@@ -64,7 +71,7 @@ export function ScanPage() {
     return () => {
       if (unlisten) unlisten();
     };
-  }, [dispatch, state.progressPercent]);
+  }, [dispatch]);
 
   // 轮询 session state，作为 fallback 兜底
   useEffect(() => {

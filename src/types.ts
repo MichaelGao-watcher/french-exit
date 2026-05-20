@@ -14,6 +14,12 @@ export type ScanId = string;
 export type ExecutionPlanId = string;
 export type SessionId = string;
 
+export interface ScanResultSummary {
+  id: TraceItemId;
+  category: TraceCategory;
+  suggested_action: Action | null;
+}
+
 export interface TraceItem {
   id: TraceItemId;
   category: TraceCategory;

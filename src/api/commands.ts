@@ -11,6 +11,7 @@ import type {
   ExecutionReport,
   PaginatedResult,
   ResourceConfig,
+  ScanResultSummary,
   TraceItem,
   ProgressEvent,
 } from "../types";
@@ -72,6 +73,13 @@ export async function startExecution(): Promise<ExecutionReport> {
  */
 export async function getSessionState(): Promise<string> {
   return invoke("get_session_state");
+}
+
+/**
+ * 获取所有扫描结果轻量摘要（用于全选全部）
+ */
+export async function getAllScanSummaries(): Promise<ScanResultSummary[]> {
+  return invoke("get_all_scan_summaries");
 }
 
 /**

@@ -241,6 +241,34 @@ pub async fn get_session_state(
     Ok(state.orchestrator.current_state())
 }
 
+/// CMD-09: 获取所有扫描结果轻量摘要（用于全选全部）
+#[tauri::command]
+pub async fn get_all_scan_summaries(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::types::ScanResultSummary>, FrontendError> {
+    let mut all = Vec::new();
+    let mut offset = 0usize;
+    const PAGE_SIZE: usize = 1000;
+    loop {
+        let page = state
+            .temp_store
+            .load_scan_results(offset, PAGE_SIZE)
+            .map_err(FrontendError::from)?;
+        if page.is_empty() {
+            break;
+        }
+        for item in page {
+            all.push(crate::types::ScanResultSummary {
+                id: item.id,
+                category: item.category,
+                suggested_action: item.suggested_action,
+            });
+        }
+        offset += PAGE_SIZE;
+    }
+    Ok(all)
+}
+
 /// CMD-10: 打开文件所在文件夹
 #[tauri::command]
 pub fn open_path(path: String) -> Result<(), FrontendError> {

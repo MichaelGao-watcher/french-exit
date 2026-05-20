@@ -143,6 +143,15 @@ pub struct ResourceConfig {
     pub unlimited: bool,
 }
 
+/// 扫描结果轻量摘要（用于全选全部，避免加载完整 TraceItem）
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ScanResultSummary {
+    pub id: TraceItemId,
+    pub category: TraceCategory,
+    pub suggested_action: Option<Action>,
+}
+
 /// 预览结果
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]

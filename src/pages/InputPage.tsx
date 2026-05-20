@@ -6,7 +6,7 @@
  */
 import { useState, useCallback } from "react";
 import { useAppState } from "../store/AppContext";
-import { startScan } from "../api/commands";
+import { startScan, setResourceConfig } from "../api/commands";
 import { DatePicker } from "../components/DatePicker";
 
 /** 将用户选择的局部日期补全为 YYYY-MM-DD，供后端使用 */
@@ -79,6 +79,21 @@ export function InputPage() {
 
   const canStart = Boolean(state.startDate) && !isLoading;
 
+  const handleToggleResource = useCallback(async () => {
+    const next = {
+      ...state.resourceConfig,
+      unlimited: !state.resourceConfig.unlimited,
+    };
+    try {
+      await setResourceConfig(next);
+      dispatch({ type: "SET_RESOURCE_CONFIG", payload: next });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "设置资源限制失败，请稍后重试";
+      dispatch({ type: "SET_ERROR", payload: message });
+    }
+  }, [state.resourceConfig, dispatch]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">
       <div className="w-full max-w-lg">
@@ -105,6 +120,41 @@ export function InputPage() {
             <p className="mt-1.5 text-xs text-muted-foreground">
               系统将扫描该时间之后产生的个人文件与痕迹
             </p>
+          </div>
+
+          {/* CPU 限速开关 */}
+          <div className="flex items-center justify-between mb-5 rounded-xl border border-border bg-card/40 p-4">
+            <div className="flex-1 pr-4">
+              <p className="text-sm font-medium text-foreground">
+                {state.resourceConfig.unlimited
+                  ? "不限速全量运行"
+                  : "智能限速模式"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {state.resourceConfig.unlimited
+                  ? "使用全部 CPU 性能，可能略微影响其他程序"
+                  : "CPU 限制在 30% 以下，办公不卡顿"}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!state.resourceConfig.unlimited}
+              onClick={handleToggleResource}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+                !state.resourceConfig.unlimited
+                  ? "bg-blue-600"
+                  : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                  !state.resourceConfig.unlimited
+                    ? "translate-x-6"
+                    : "translate-x-1"
+                }`}
+              />
+            </button>
           </div>
 
           {/* 开始按钮 */}

@@ -200,6 +200,19 @@ unzip -o webview2.nupkg "build/native/x64/WebView2Loader.dll" -d ./extracted/
 - CSS `@keyframes dropdownIn` 实现淡入+位移动画
 - 年月日联动限制（如今年只显示到当前月）
 
+### Tauri dev 模式与后台任务的兼容性
+
+- `cargo tauri dev` 必须在**交互式 Windows 桌面会话**中运行，无法通过远程/后台任务启动（WebView2 需要 GUI 上下文）
+- **替代方案**：`npm run dev` 启动 Vite 服务器 → 浏览器访问 `http://localhost:1420` → 可实时预览前端 UI（HMR 热更新），但 IPC 调用会失败
+- **完整功能验证**：仍需本地运行 `cargo tauri dev` 或双击 release `.exe`
+
+### 全选大批量数据的前后端协作模式
+
+当扫描结果达一万条以上时，前端逐页加载再全选不现实：
+- 不要一次性加载所有完整 `TraceItem` 到前端（内存 + DOM 渲染压力大）
+- 正确做法：后端提供**轻量摘要接口**（只返回 id + category + suggested_action），前端用它批量生成 decisions
+- 用户实际浏览仍按分页，但"全选全部"走轻量接口，两者解耦
+
 ---
 
 *最后更新：2026-05-20*

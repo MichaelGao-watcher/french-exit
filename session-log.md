@@ -237,3 +237,33 @@
 
 **遗留问题 / 下轮开始点**：
 - 项目核心功能与测试体系已完备，产物已整理到 `release/` 目录，可直接上传分发
+
+---
+
+### 2026-05-20 16:30-16:50
+
+**目标**：响应用户三项反馈：纯黑背景、第二次扫描进度条异常、缺少 CPU 30%/全量切换；随后响应 ResultsPage 全选和路径交互问题
+
+**实际完成**：
+- ✅ 纯黑色背景：`index.css` `.dark` 变量从深蓝黑 `222.2 84% 4.9%` 改为纯黑 `0 0% 0%`，卡片/边框同步调整为灰色调
+- ✅ 第二次扫描进度条修复：`ScanPage.tsx` 添加挂载时重置进度到 0% 的 effect；将 `state.progressPercent` 从 `listenScanProgress` effect 依赖中移除，改用 `useRef` 避免闭包过时和 listener 重复注册
+- ✅ CPU 限制 toggle：`InputPage.tsx` 新增"智能限速模式 / 不限速全量运行"切换开关；`lib.rs` 启动时调用 `apply_limits(default_config())` 确保 RULE-05 真正生效
+- ✅ 全选全部功能：后端新增 `ScanResultSummary` + `get_all_scan_summaries` command；前端 ResultsPage 新增"全选全部"蓝色按钮，调用轻量接口批量选中所有痕迹（自动排除 EnvVar）
+- ✅ 路径可点击：`ResultsPage.tsx` 路径文本改为可点击按钮，hover 变蓝+下划线，点击调用 `explorer` 打开所在文件夹；原有"打开"按钮保留
+- ✅ 前端 vitest 52 测全绿（新增 InputPage toggle 2 测）
+- ✅ release 重新构建并复制到 `release/` 目录（时间戳 16:45）
+- ⚠️ `cargo tauri dev` 无法在 background task 中启动 GUI（`STATUS_ACCESS_VIOLATION`）
+- ✅ 变通启动 `npm run dev`（Vite 服务器），浏览器可预览 UI
+
+**关键决策**：
+- **全选全部方案**：后端提供轻量摘要接口，而非前端加载所有完整数据。理由：一万条 TraceItem 的内存+DOM 开销不可接受。
+- **路径交互设计**：路径文本本身可点击，同时保留"打开"按钮。理由：用户直觉是"看到路径就想点"，双入口覆盖不同习惯。
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：`cargo tauri dev` 在 background task 中崩溃 → 根因：Tauri WebView2 需要 Windows 桌面 GUI 上下文，后台环境缺失 → 解决：改用 `npm run dev` 启动 Vite 服务器，浏览器预览前端 UI；完整功能验证仍用本地 `cargo tauri dev` 或 release exe
+- **阻碍**：`ScanPage` effect 依赖 `state.progressPercent` 导致 listener 频繁重新注册 → 根因：React effect 依赖数组包含变化的状态 → 解决：用 `useRef` 保存当前进度，移除依赖
+
+**遗留问题 / 下轮开始点**：
+- Vite 开发服务器仍在运行（`http://localhost:1420`），可用于浏览器预览前端 UI
+- 用户表示"要调的还有很多，后续都通过开发者模式预览"——后续前端调整可基于此工作流迭代
+- 完整功能验证（IPC/扫描/打开文件夹）仍需 release exe 或本地 `cargo tauri dev`

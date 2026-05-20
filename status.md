@@ -130,6 +130,8 @@ e2e/
 | 2026-05-20 | 前端 vitest 从 23 测提升到 42 测（新增 InputPage/ConfirmPage/ExecutingPage/ReportPage）；E2E 从 11 测提升到 16 测（新增 boundary-flows：深色模式、重置、空结果、扫描失败、取消扫描） |
 | 2026-05-20 | P1 UCRT 实际修复（拆分 commands/handlers.rs + lib.rs `#[cfg(not(test))]`）；后端 Rust 测试从 88 测提升到 103 测（新增 error 4 + preserve 2 + scanner/mod 2 + orchestrator 7） |
 | 2026-05-20 | UI/UX 迭代：自定义 DatePicker（年/月/日精度，未来日期不可选，丝滑下拉面板）；WebView2 零依赖方案（NuGet 提取 WebView2Loader.dll + EdgeCore 回退）；全局默认 dark 主题；ResultsPage 修改时间 + 打开路径；工作区 release/ 目录整理 |
+| 2026-05-20 | 修复：纯黑色背景（CSS 变量纯黑/灰色调）；第二次扫描进度条残留（ScanPage 挂载重置 + 移除闭包依赖）；InputPage 新增 CPU 30%/全量 toggle；后端 lib.rs 启动时 apply_limits 真正生效 |
+| 2026-05-20 | 新增：ResultsPage "全选全部"按钮（后端 get_all_scan_summaries 轻量接口）；路径文本可点击打开所在文件夹；Vite 开发服务器作为前端预览方案；release 重新构建并分发 |
 
 ---
 

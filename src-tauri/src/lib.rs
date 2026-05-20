@@ -48,6 +48,10 @@ pub fn run() {
     // 3. 初始化 ResourceController（资源限制）
     // ------------------------------------------------------------------
     let resource_controller = Arc::new(resource::controller::ResourceController::new());
+    // 应用默认 CPU 限制（RULE-05：默认启用 ≤30%）
+    if let Err(e) = resource_controller.apply_limits(resource::controller::ResourceController::default_config()) {
+        eprintln!("应用默认资源限制失败: {}", e);
+    }
 
     // ------------------------------------------------------------------
     // 4. 初始化各执行器
@@ -98,6 +102,7 @@ pub fn run() {
             commands::get_resource_config,
             commands::set_resource_config,
             commands::get_session_state,
+            commands::get_all_scan_summaries,
             commands::open_path,
         ])
         .setup(|app| {

@@ -7,10 +7,12 @@ import { AppProvider, TestAppProvider } from "../store/AppContext";
 
 vi.mock("../api/commands", () => ({
   startScan: vi.fn(),
+  setResourceConfig: vi.fn(),
 }));
 
-import { startScan } from "../api/commands";
+import { startScan, setResourceConfig } from "../api/commands";
 const mockStartScan = vi.mocked(startScan);
+const mockSetResourceConfig = vi.mocked(setResourceConfig);
 
 function renderWithProvider(ui: React.ReactElement) {
   return render(<AppProvider>{ui}</AppProvider>);
@@ -26,6 +28,7 @@ function renderWithState(
 describe("InputPage", () => {
   beforeEach(() => {
     mockStartScan.mockClear();
+    mockSetResourceConfig.mockClear();
   });
 
   it("renders title and date picker", () => {
@@ -288,5 +291,31 @@ describe("InputPage", () => {
       expect(errorEl).not.toBeInTheDocument();
     });
     expect(mockStartScan).toHaveBeenCalledWith(`${y}-${m}-${d}`);
+  });
+
+  it("renders CPU limit toggle with default limited mode", () => {
+    renderWithProvider(<InputPage />);
+    expect(screen.getByText(/智能限速模式/i)).toBeInTheDocument();
+    expect(screen.getByText(/CPU 限制在 30% 以下/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { checked: true }),
+    ).toBeInTheDocument();
+  });
+
+  it("toggles CPU limit to unlimited", async () => {
+    mockSetResourceConfig.mockResolvedValue(undefined);
+    renderWithProvider(<InputPage />);
+    const user = userEvent.setup();
+
+    const toggle = screen.getByRole("switch", { checked: true });
+    await user.click(toggle);
+
+    await waitFor(() => {
+      expect(mockSetResourceConfig).toHaveBeenCalledWith({
+        cpu_limit_percent: 30,
+        unlimited: true,
+      });
+    });
+    expect(screen.getByText(/不限速全量运行/i)).toBeInTheDocument();
   });
 });

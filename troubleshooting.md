@@ -116,6 +116,17 @@
 
 ---
 
+### cargo tauri dev 在后台任务中崩溃
+
+| | 内容 |
+|---|---|
+| **现象** | `cargo tauri dev` 启动后编译成功，但运行时报 `exit code: 0xc0000005, STATUS_ACCESS_VIOLATION`，随后 Segmentation fault |
+| **原因** | Tauri 应用需要创建 WebView2 GUI 窗口，而 background task / SSH / 无头环境缺少 Windows 桌面会话和显示上下文 |
+| **解决** | 1. 在本地交互式终端（PowerShell/CMD）中手动运行 `cargo tauri dev`<br>2. 或改用 `npm run dev` 仅启动 Vite 前端服务器，在浏览器中预览 UI（IPC 功能不可用） |
+| **注意** | 此限制仅影响 GUI 启动方式，不影响 `cargo tauri build` 构建产物 |
+
+---
+
 *新增条目时复制上方模板，按"错误关键词"作为标题，便于快速搜索。*
 
 ---

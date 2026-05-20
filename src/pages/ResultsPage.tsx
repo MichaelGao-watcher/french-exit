@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useAppState } from "../store/AppContext";
-import { getScanResults, openPath } from "../api/commands";
+import { getScanResults, getAllScanSummaries, openPath } from "../api/commands";
 import type { TraceCategory, TraceItem, Decision } from "../types";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -186,6 +186,34 @@ export function ResultsPage() {
     dispatch({ type: "SET_DECISIONS", payload: newDecisions });
   };
 
+  const selectAllAll = async () => {
+    try {
+      const summaries = await getAllScanSummaries();
+      const ids = new Set<string>();
+      const newDecisions = new Map(state.decisions);
+
+      summaries.forEach((summary) => {
+        ids.add(summary.id);
+        if (summary.category === "EnvVar") return;
+        const action = summary.suggested_action === "DeleteOrPack" || summary.suggested_action === "Delete"
+          ? "Delete"
+          : summary.suggested_action === "Preserve"
+          ? "Preserve"
+          : summary.suggested_action === "Pack"
+          ? "Pack"
+          : null;
+        if (action) {
+          newDecisions.set(summary.id, { item_id: summary.id, action });
+        }
+      });
+
+      setSelectedIds(ids);
+      dispatch({ type: "SET_DECISIONS", payload: newDecisions });
+    } catch (e: any) {
+      dispatch({ type: "SET_ERROR", payload: e.message || "全选全部失败" });
+    }
+  };
+
   const deselectAll = () => {
     setSelectedIds(new Set());
     const newDecisions = new Map(state.decisions);
@@ -350,9 +378,17 @@ export function ResultsPage() {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground truncate mt-0.5">
-                  {item.path || "-"}
-                </div>
+                {item.path ? (
+                  <button
+                    onClick={() => openPath(item.path!)}
+                    className="text-xs text-muted-foreground truncate mt-0.5 text-left hover:text-blue-400 hover:underline transition block w-full"
+                    title="点击打开所在文件夹"
+                  >
+                    {item.path}
+                  </button>
+                ) : (
+                  <div className="text-xs text-muted-foreground truncate mt-0.5">-</div>
+                )}
                 <div className="text-xs text-muted-foreground mt-0.5 flex gap-3">
                   <span>{formatBytes(item.size_bytes)}</span>
                   <span className="text-foreground/70">修改于 {formatDate(item.modified_at)}</span>
@@ -431,6 +467,12 @@ export function ResultsPage() {
                 className="px-3 py-1.5 text-xs bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition"
               >
                 全选本页
+              </button>
+              <button
+                onClick={selectAllAll}
+                className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                全选全部 ({totalCount})
               </button>
               <button
                 onClick={deselectAll}
