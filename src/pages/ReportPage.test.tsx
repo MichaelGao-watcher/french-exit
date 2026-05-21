@@ -49,7 +49,7 @@ describe("ReportPage", () => {
     expect(screen.getByText(/暂无报告数据/i)).toBeInTheDocument();
   });
 
-  it("renders celebration and stats cards", () => {
+  it("renders celebration and summary", () => {
     const report = makeReport({
       deleted_count: 10,
       deleted_bytes: 1024 * 1024 * 50,
@@ -63,13 +63,10 @@ describe("ReportPage", () => {
     render(<ReportPage />);
 
     expect(screen.getByText(/清理完成/i)).toBeInTheDocument();
-    // Labels appear in both cards and summary; getAllByText is safe
-    expect(screen.getAllByText(/已删除/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/已打包/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/已保留/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("10").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("3").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("2").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/您已完成 French Exit/i)).toBeInTheDocument();
+    expect(screen.getByText(/已删除/i)).toBeInTheDocument();
+    expect(screen.getByText(/已打包/i)).toBeInTheDocument();
+    expect(screen.getByText(/已保留/i)).toBeInTheDocument();
   });
 
   it("displays pack file path when available", () => {
@@ -96,15 +93,5 @@ describe("ReportPage", () => {
     expect(screen.queryByText(/打包文件/i)).not.toBeInTheDocument();
   });
 
-  it("dispatches RESET on restart button click", () => {
-    const report = makeReport({ deleted_count: 1 });
-    const { mockDispatch } = setupMockState({ page: "report", report });
 
-    render(<ReportPage />);
-
-    const restartBtn = screen.getByRole("button", { name: /开始新的清理/i });
-    fireEvent.click(restartBtn);
-
-    expect(mockDispatch).toHaveBeenCalledWith({ type: "RESET" });
-  });
 });

@@ -16,6 +16,26 @@ import { ResultsPage } from "./pages/ResultsPage";
 import { ConfirmPage } from "./pages/ConfirmPage";
 import { ExecutingPage } from "./pages/ExecutingPage";
 import { ReportPage } from "./pages/ReportPage";
+import type { ExecutionReport } from "./types";
+
+const MOCK_REPORT: ExecutionReport = {
+  deleted_count: 12,
+  deleted_bytes: 1024 * 1024 * 128,
+  packed_count: 5,
+  packed_bytes: 1024 * 1024 * 64,
+  preserved_count: 3,
+  pack_file_path: "C:\\Users\\Admin\\Desktop\\French-exit.zip",
+  items: [],
+};
+
+const PAGES: { key: string; label: string }[] = [
+  { key: "input", label: "输入" },
+  { key: "scanning", label: "扫描" },
+  { key: "results", label: "结果" },
+  { key: "confirm", label: "确认" },
+  { key: "executing", label: "执行" },
+  { key: "report", label: "报告" },
+];
 
 function AppContent() {
   const { state, dispatch } = useAppState();
@@ -37,6 +57,38 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+      {/* 开发者导航：仅在非 Tauri 环境（纯前端预览）显示 */}
+      {!window.__TAURI_INTERNALS__ && (
+        <div className="border-b border-border/50 bg-card/50 backdrop-blur-sm">
+          <div className="container mx-auto px-4 py-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-muted-foreground font-medium">调试导航:</span>
+            {PAGES.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => {
+                  if (p.key === "report" && !state.report) {
+                    dispatch({ type: "SET_REPORT", payload: MOCK_REPORT });
+                  }
+                  dispatch({ type: "SET_PAGE", payload: p.key as any });
+                }}
+                className={`px-2.5 py-1 rounded-md transition ${
+                  state.page === p.key
+                    ? "bg-blue-600 text-white"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+            <button
+              onClick={() => dispatch({ type: "RESET" })}
+              className="px-2.5 py-1 rounded-md bg-red-600/20 text-red-400 hover:bg-red-600/30 transition ml-auto"
+            >
+              重置
+            </button>
+          </div>
+        </div>
+      )}
       <main className="container mx-auto px-4 py-8">
         {state.page === "input" && <InputPage />}
         {state.page === "scanning" && <ScanPage />}

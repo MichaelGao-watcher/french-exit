@@ -78,8 +78,7 @@ export const initialState: AppState = {
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "SET_PAGE":
-      // 切换页面时自动清空错误提示
-      return { ...state, page: action.payload, error: null };
+      return { ...state, page: action.payload };
     case "SET_START_DATE":
       return { ...state, startDate: action.payload };
     case "SET_SCAN_ID":

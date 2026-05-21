@@ -213,6 +213,43 @@ unzip -o webview2.nupkg "build/native/x64/WebView2Loader.dll" -d ./extracted/
 - 正确做法：后端提供**轻量摘要接口**（只返回 id + category + suggested_action），前端用它批量生成 decisions
 - 用户实际浏览仍按分页，但"全选全部"走轻量接口，两者解耦
 
+### 前端代码审计的四维度分类法
+
+对已有前端代码进行系统审计时，按以下四个维度分类，可避免遗漏且便于排优先级：
+
+| 维度 | 关注内容 | 示例 |
+|------|---------|------|
+| **Bug** | 逻辑错误导致功能异常 | reducer 中 SET_PAGE 自动清空 error，导致错误信息被吞 |
+| **性能** | 重复计算、不必要的渲染 | ConfirmPage 每次渲染三次全量 filter |
+| **DRY** | 重复代码、可提取组件 | formatBytes 在三处重复定义、三个清单卡片结构完全重复 |
+| **UX** | 交互设计缺陷 | 下一步按钮无前置校验、文件名 truncate 后无法查看全称 |
+
+审计完成后按 **Bug > 性能 > DRY > UX** 优先级修复，先保正确性再保体验。
+
+### 纯前端预览模式下的 IPC mock 策略
+
+`npm run dev`（Vite 纯前端）没有 Rust 后端，Tauri IPC 调用会失败。若需在浏览器中完整预览所有页面流程：
+
+1. **开发调试导航面板**：在 App.tsx 中通过检测 `window.__TAURI_INTERNALS__` 是否缺失，显示页面跳转按钮， bypass 正常流程
+2. **模拟异步进度**：ExecutingPage 中检测非 Tauri 环境，用 `setInterval` 模拟进度递增，完成后自动跳转并注入 mock report
+3. **自动注入 mock 数据**：调试面板点击"报告"时，若 `state.report` 为空，自动 dispatch SET_REPORT 注入 mock 数据
+
+核心原则：**mock 只注入数据，不改页面渲染逻辑**——真实 Tauri 环境中的行为与 mock 环境完全一致。
+
+### GitHub 用户名变更的批量处理脚本
+
+用户名变更后，每台设备的每个本地仓库都需要更新 remote URL（Git 不跨设备同步）。自动化脚本要点：
+
+1. **dry-run 先预览**：只读列出会被修改的仓库，用户确认后再执行
+2. **全局 Git 配置同步**：同时更新 `user.name` 和 `user.email`（noreply 格式）
+3. **生成可复用脚本**：填好新旧用户名后保存为 `.sh`，复制到另一台设备直接运行
+
+脚本模板核心（sed 替换旧用户名为新用户名）：
+```bash
+new_url=$(echo "$old_url" | sed "s/$OLD_USER/$NEW_USER/")
+git remote set-url origin "$new_url"
+```
+
 ---
 
-*最后更新：2026-05-20*
+*最后更新：2026-05-21*

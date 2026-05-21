@@ -136,7 +136,7 @@ export function DatePicker({
           animate-[dropdownIn_0.18s_ease-out]
         "
       >
-        <div className="max-h-52 overflow-y-auto py-1.5">
+        <div className="max-h-52 overflow-y-auto py-1.5 no-scrollbar">
           {options.map((opt) => (
             <button
               key={opt}

@@ -1,22 +1,27 @@
 import { useAppState } from "../store/AppContext";
 import { submitDecisions } from "../api/commands";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { formatBytes } from "../utils/format";
+import type { TraceItem } from "../types";
 
 export function ConfirmPage() {
   const { state, dispatch } = useAppState();
   const [showDialog, setShowDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 按 action 分组
-  const deleteItems = state.scanResults.filter(
-    (item) => state.decisions.get(item.id)?.action === "Delete"
-  );
-  const packItems = state.scanResults.filter(
-    (item) => state.decisions.get(item.id)?.action === "Pack"
-  );
-  const preserveItems = state.scanResults.filter(
-    (item) => state.decisions.get(item.id)?.action === "Preserve"
-  );
+  // 按 action 分组（useMemo 避免每次渲染重复全量遍历）
+  const { deleteItems, packItems, preserveItems } = useMemo(() => {
+    const deleteItems: TraceItem[] = [];
+    const packItems: TraceItem[] = [];
+    const preserveItems: TraceItem[] = [];
+    for (const item of state.scanResults) {
+      const action = state.decisions.get(item.id)?.action;
+      if (action === "Delete") deleteItems.push(item);
+      else if (action === "Pack") packItems.push(item);
+      else if (action === "Preserve") preserveItems.push(item);
+    }
+    return { deleteItems, packItems, preserveItems };
+  }, [state.scanResults, state.decisions]);
 
   const handleBack = () => {
     dispatch({ type: "SET_PAGE", payload: "results" });
@@ -54,92 +59,9 @@ export function ConfirmPage() {
         </p>
       </div>
 
-      {/* 删除清单 */}
-      {deleteItems.length > 0 && (
-        <div className="mb-6 bg-card/80 backdrop-blur-xl rounded-2xl border border-red-200 dark:border-red-900/50 overflow-hidden">
-          <div className="px-5 py-3 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-900/30">
-            <h3 className="font-medium text-red-700 dark:text-red-400 flex items-center gap-2">
-              <span>🗑️</span> 待删除（{deleteItems.length} 条）
-            </h3>
-          </div>
-          <ul className="divide-y divide-border/50 max-h-60 overflow-y-auto">
-            {deleteItems.map((item) => (
-              <li
-                key={item.id}
-                className="px-5 py-2.5 flex items-center justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {item.path || "-"}
-                  </p>
-                </div>
-                <span className="text-xs text-red-600 dark:text-red-400 ml-4 shrink-0">
-                  {item.size_bytes ? formatBytes(item.size_bytes) : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* 打包清单 */}
-      {packItems.length > 0 && (
-        <div className="mb-6 bg-card/80 backdrop-blur-xl rounded-2xl border border-blue-200 dark:border-blue-900/50 overflow-hidden">
-          <div className="px-5 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-900/30">
-            <h3 className="font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2">
-              <span>📦</span> 待打包（{packItems.length} 条）
-            </h3>
-          </div>
-          <ul className="divide-y divide-border/50 max-h-60 overflow-y-auto">
-            {packItems.map((item) => (
-              <li
-                key={item.id}
-                className="px-5 py-2.5 flex items-center justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {item.path || "-"}
-                  </p>
-                </div>
-                <span className="text-xs text-blue-600 dark:text-blue-400 ml-4 shrink-0">
-                  {item.size_bytes ? formatBytes(item.size_bytes) : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* 保留清单 */}
-      {preserveItems.length > 0 && (
-        <div className="mb-6 bg-card/80 backdrop-blur-xl rounded-2xl border border-border overflow-hidden">
-          <div className="px-5 py-3 bg-muted/50 border-b border-border/50">
-            <h3 className="font-medium text-muted-foreground flex items-center gap-2">
-              <span>✓</span> 待保留（{preserveItems.length} 条）
-            </h3>
-          </div>
-          <ul className="divide-y divide-border/50 max-h-60 overflow-y-auto">
-            {preserveItems.map((item) => (
-              <li
-                key={item.id}
-                className="px-5 py-2.5 flex items-center justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {item.path || "-"}
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground ml-4 shrink-0">
-                  {item.size_bytes ? formatBytes(item.size_bytes) : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <DecisionGroup items={deleteItems} icon="🗑️" title="待删除" variant="red" />
+      <DecisionGroup items={packItems} icon="📦" title="待打包" variant="blue" />
+      <DecisionGroup items={preserveItems} icon="✓" title="待保留" variant="gray" />
 
       {/* 底部操作 */}
       <div className="flex gap-3 sticky bottom-4 bg-background/80 backdrop-blur-xl p-4 rounded-2xl border border-border">
@@ -197,16 +119,68 @@ export function ConfirmPage() {
       )}
 
       {state.error && (
-        <p className="mt-4 text-sm text-red-500 text-center">{state.error}</p>
+        <p className="mt-4 text-sm text-center">{state.error}</p>
       )}
     </div>
   );
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+interface DecisionGroupProps {
+  items: TraceItem[];
+  icon: string;
+  title: string;
+  variant: "red" | "blue" | "gray";
+}
+
+function DecisionGroup({ items, icon, title, variant }: DecisionGroupProps) {
+  if (items.length === 0) return null;
+
+  const styles = {
+    red: {
+      border: "border-red-200 dark:border-red-900/50",
+      headerBg: "bg-red-50 dark:bg-red-900/20",
+      headerBorder: "border-red-100 dark:border-red-900/30",
+      title: "text-red-700 dark:text-red-400",
+      size: "text-red-600 dark:text-red-400",
+    },
+    blue: {
+      border: "border-blue-200 dark:border-blue-900/50",
+      headerBg: "bg-blue-50 dark:bg-blue-900/20",
+      headerBorder: "border-blue-100 dark:border-blue-900/30",
+      title: "text-blue-700 dark:text-blue-400",
+      size: "text-blue-600 dark:text-blue-400",
+    },
+    gray: {
+      border: "border-border",
+      headerBg: "bg-muted/50",
+      headerBorder: "border-border/50",
+      title: "text-muted-foreground",
+      size: "text-muted-foreground",
+    },
+  };
+
+  const s = styles[variant];
+
+  return (
+    <div className={`mb-6 bg-card/80 backdrop-blur-xl rounded-2xl border ${s.border} overflow-hidden`}>
+      <div className={`px-5 py-3 ${s.headerBg} border-b ${s.headerBorder}`}>
+        <h3 className={`font-medium ${s.title} flex items-center gap-2`}>
+          <span>{icon}</span> {title}（{items.length} 条）
+        </h3>
+      </div>
+      <ul className="divide-y divide-border/50 max-h-60 overflow-y-auto">
+        {items.map((item) => (
+          <li key={item.id} className="px-5 py-2.5 flex items-center justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">{item.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{item.path || "-"}</p>
+            </div>
+            <span className={`text-xs ${s.size} ml-4 shrink-0`}>
+              {item.size_bytes ? formatBytes(item.size_bytes) : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }

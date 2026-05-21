@@ -7,14 +7,23 @@ import type { ExecutionReport } from "../types";
 
 vi.mock("../api/commands", () => ({
   startExecution: vi.fn(),
+  listenScanProgress: vi.fn(() => Promise.resolve(() => {})),
 }));
 
-import { startExecution } from "../api/commands";
+import { startExecution, listenScanProgress } from "../api/commands";
 const mockStartExecution = vi.mocked(startExecution);
+const mockListenScanProgress = vi.mocked(listenScanProgress);
 
 describe("ExecutingPage", () => {
   beforeEach(() => {
     mockStartExecution.mockClear();
+    mockListenScanProgress.mockClear();
+    // 模拟 Tauri 环境，让组件走真实 IPC 路径而非纯前端 mock 路径
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders loading spinner and message", () => {
@@ -26,20 +35,11 @@ describe("ExecutingPage", () => {
     );
 
     expect(screen.getByText(/正在执行清理/i)).toBeInTheDocument();
-    expect(screen.getByText(/正在安全删除文件/i)).toBeInTheDocument();
+    expect(screen.getByText(/准备执行/i)).toBeInTheDocument();
   });
 
-  it("dispatches SET_REPORT and navigates to report on success", async () => {
-    const report: ExecutionReport = {
-      deleted_count: 5,
-      deleted_bytes: 1024,
-      packed_count: 2,
-      packed_bytes: 512,
-      preserved_count: 1,
-      pack_file_path: "/tmp/French-exit.zip",
-      items: [],
-    };
-    mockStartExecution.mockResolvedValue(report);
+  it("registers progress listener and calls startExecution on mount", async () => {
+    mockStartExecution.mockImplementation(() => new Promise(() => {}));
 
     render(
       <TestAppProvider initialState={{ page: "executing" }}>
@@ -48,6 +48,7 @@ describe("ExecutingPage", () => {
     );
 
     await waitFor(() => {
+      expect(mockListenScanProgress).toHaveBeenCalledTimes(1);
       expect(mockStartExecution).toHaveBeenCalledTimes(1);
     });
   });

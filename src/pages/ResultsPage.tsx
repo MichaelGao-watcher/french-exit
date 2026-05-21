@@ -15,6 +15,7 @@ import { useAppState } from "../store/AppContext";
 import { getScanResults, getAllScanSummaries, openPath } from "../api/commands";
 import type { TraceCategory, TraceItem, Decision } from "../types";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { formatBytes, formatDate } from "../utils/format";
 
 const CATEGORIES: { key: TraceCategory | "all"; label: string }[] = [
   { key: "all", label: "全部" },
@@ -26,25 +27,6 @@ const CATEGORIES: { key: TraceCategory | "all"; label: string }[] = [
   { key: "DevTools", label: "开发工具" },
   { key: "EnvVar", label: "环境变量" },
 ];
-
-function formatBytes(bytes: number | null): string {
-  if (bytes === null || bytes === undefined) return "-";
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "-";
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleString("zh-CN");
-  } catch {
-    return dateStr;
-  }
-}
 
 function getDefaultAction(item: TraceItem): "Delete" | "Preserve" | "Pack" | null {
   if (item.suggested_action === "DeleteOrPack" || item.suggested_action === "Delete") {
@@ -195,13 +177,7 @@ export function ResultsPage() {
       summaries.forEach((summary) => {
         ids.add(summary.id);
         if (summary.category === "EnvVar") return;
-        const action = summary.suggested_action === "DeleteOrPack" || summary.suggested_action === "Delete"
-          ? "Delete"
-          : summary.suggested_action === "Preserve"
-          ? "Preserve"
-          : summary.suggested_action === "Pack"
-          ? "Pack"
-          : null;
+        const action = getDefaultAction(summary);
         if (action) {
           newDecisions.set(summary.id, { item_id: summary.id, action });
         }
@@ -371,7 +347,7 @@ export function ResultsPage() {
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm truncate">{item.name}</span>
+                  <span className="font-medium text-sm truncate" title={item.name}>{item.name}</span>
                   {item.inferred && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded">
                       推断
@@ -511,7 +487,8 @@ export function ResultsPage() {
         <div className="flex justify-end">
           <button
             onClick={() => dispatch({ type: "SET_PAGE", payload: "confirm" })}
-            className="px-8 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 active:scale-95 transition"
+            disabled={state.decisions.size === 0}
+            className="px-8 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             下一步：确认执行
           </button>
@@ -581,7 +558,7 @@ export function ResultsPage() {
                   <span className="text-sm">加载中...</span>
                 </div>
               ) : previewContent?.startsWith("ERROR:") ? (
-                <p className="text-red-500 text-sm">
+                <p className="text-sm">
                   {previewContent.replace("ERROR: ", "")}
                 </p>
               ) : previewContent?.startsWith("IMAGE:") ? (
@@ -611,7 +588,7 @@ export function ResultsPage() {
       )}
 
       {state.error && (
-        <p className="mt-4 text-sm text-red-500 text-center">{state.error}</p>
+        <p className="mt-4 text-sm text-center">{state.error}</p>
       )}
     </div>
   );

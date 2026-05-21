@@ -267,3 +267,50 @@
 - Vite 开发服务器仍在运行（`http://localhost:1420`），可用于浏览器预览前端 UI
 - 用户表示"要调的还有很多，后续都通过开发者模式预览"——后续前端调整可基于此工作流迭代
 - 完整功能验证（IPC/扫描/打开文件夹）仍需 release exe 或本地 `cargo tauri dev`
+
+
+### 2026-05-21 08:40-13:15
+
+**目标**：前端全面调整（审计修复 8 项）+ AGENTS.md 骨架修复 + GitHub 用户名批量更新
+
+**实际完成**：
+- ✅ AGENTS.md 骨架审计修复（对照 vibe-coding-project-sop 骨架）
+  - 新增 §0 文档体系说明（基础设施层 7 文件 + 阶段产出层映射）
+  - §3.6 恢复指令补充两条约束（推荐理由必须具体、推荐项只能有 1 个）
+  - §3.6 汇报格式 A 追加推荐理由行
+- ✅ Bug #1：ExecutingPage 错误被吞 —— SET_PAGE reducer 不再自动清空 error
+- ✅ 性能 #2：ConfirmPage 三次 filter → useMemo + 单次遍历（O(3n)→O(n)）
+- ✅ DRY #3：formatBytes/formatDate 提取 `src/utils/format.ts`
+- ✅ DRY #4：ConfirmPage 提取 DecisionGroup 通用组件
+- ✅ DRY #5：ResultsPage selectAllAll 复用 getDefaultAction
+- ✅ UX #6：ResultsPage "下一步"按钮未选中时禁用
+- ✅ UX #7：ResultsPage 文件名加 title 属性
+- ✅ UX #8：ExecutingPage 监听 ExecutionProgress + 进度条展示
+- ✅ UI：错误提示全部改为白色无闪烁（去掉 text-red-500 + animate-pulse）
+- ✅ UI：所有"你"→"您"（10 个文件全局替换）
+- ✅ UI：DatePicker 下拉面板隐藏滚动条（.no-scrollbar utility）
+- ✅ UI：CPU 限速文案更新为"不影响您的正常使用"
+- ✅ UI：CPU toggle 从 InputPage 移至 ScanPage
+- ✅ UI：进度条极简风格（h-0.5 细线、去掉圆角、duration-1500ms 慢速）
+- ✅ UI：ReportPage 重构（去掉 Emoji/卡片/按钮，主文案大标题居中，明细收缩底部小字）
+- ✅ UI：ExecutingPage 去掉 spinner 圆圈
+- ✅ 开发体验：App.tsx 添加调试导航面板（非 Tauri 环境显示，可跳任意页面）
+- ✅ 开发体验：纯前端模式下 ExecutingPage 模拟进度、ReportPage 自动注入 mock 数据
+- ✅ 环境：GitHub 用户名批量更新（5 仓库 remote URL + 全局 Git user.name/email）
+- ✅ 测试：vitest 49 测全绿（同步更新 4 个测试文件适配代码变更）
+
+**关键决策**：
+- **SET_PAGE 不清空 error**：原设计切换页面时自动清空错误，导致 ExecutingPage 失败跳回 ConfirmPage 后用户看不到错误原因。改为 error 持久化，由具体场景手动清除。
+- **纯前端 mock 策略**：非 Tauri 环境下，ExecutingPage 用 setInterval 模拟进度递增，不调用真实 IPC。保证浏览器预览模式下所有页面可正常浏览。
+- **骨架修复范围**：项目已完成，通用 RULE（基础设施先行/阶段边界）对维护阶段不产生实质约束，故省略；只保留与恢复指令和文档体系结构相关的修复。
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：ExecutingPage 测试因纯前端 mock 路径不走 IPC → 测试中 mock `window.__TAURI_INTERNALS__` 存在，强制组件走真实路径
+- **阻碍**：InputPage CPU toggle 移走后测试失效 → 删除对应 2 个测试用例
+- **阻碍**：ReportPage 重构后测试查找统计数字失败 → 数字与文字在同一 JSX 中被拆分为多个文本节点，改用文案匹配替代独立数字匹配
+- **阻碍**：Vite dev server 多次因超时（1h）被终止 → 端口占用需先 taskkill 再重启
+
+**遗留问题 / 下轮开始点**：
+- Vite 预览服务器已停止，如需继续浏览器预览需重启
+- 前端 UI/UX 仍有调整空间（用户表示"要调的还有很多"），可直接给出具体修改指令
+- release/ 目录中的 exe 尚未重新构建（前端变更后建议重新打包）

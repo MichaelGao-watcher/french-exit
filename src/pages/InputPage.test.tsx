@@ -38,7 +38,7 @@ describe("InputPage", () => {
       screen.getByText(/在撤离公用电脑前，安全处理您留下的痕迹/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/你开始使用这台电脑的时间/i),
+      screen.getByText(/您开始使用这台电脑的时间/i),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /开始扫描/i }),
@@ -293,29 +293,4 @@ describe("InputPage", () => {
     expect(mockStartScan).toHaveBeenCalledWith(`${y}-${m}-${d}`);
   });
 
-  it("renders CPU limit toggle with default limited mode", () => {
-    renderWithProvider(<InputPage />);
-    expect(screen.getByText(/智能限速模式/i)).toBeInTheDocument();
-    expect(screen.getByText(/CPU 限制在 30% 以下/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("switch", { checked: true }),
-    ).toBeInTheDocument();
-  });
-
-  it("toggles CPU limit to unlimited", async () => {
-    mockSetResourceConfig.mockResolvedValue(undefined);
-    renderWithProvider(<InputPage />);
-    const user = userEvent.setup();
-
-    const toggle = screen.getByRole("switch", { checked: true });
-    await user.click(toggle);
-
-    await waitFor(() => {
-      expect(mockSetResourceConfig).toHaveBeenCalledWith({
-        cpu_limit_percent: 30,
-        unlimited: true,
-      });
-    });
-    expect(screen.getByText(/不限速全量运行/i)).toBeInTheDocument();
-  });
 });

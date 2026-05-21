@@ -33,7 +33,7 @@
   - 路径：`%USERPROFILE%\.ssh\`
   - 检测文件：`id_rsa`, `id_ed25519`, `id_ecdsa`, `*.pub`, `config`, `known_hosts`
   - 私钥文件标注 `"SSH 私钥，删除后需重新生成"`
-  - `known_hosts` 标注 `"包含你连接过的服务器记录"`
+  - `known_hosts` 标注 `"包含您连接过的服务器记录"`
   - 测试点：虚拟 `.ssh` 目录验证
 
 - [ ] **SD-03** 实现 VS Code 配置扫描

@@ -6,9 +6,9 @@
  * 2. 提供暂停 / 恢复 / 取消操作
  * 3. 轮询 session state，扫描完成后自动跳转到 results
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useAppState } from "../store/AppContext";
-import { getSessionState, pauseScan, resumeScan, listenScanProgress } from "../api/commands";
+import { getSessionState, pauseScan, resumeScan, listenScanProgress, setResourceConfig } from "../api/commands";
 
 export function ScanPage() {
   const { state, dispatch } = useAppState();
@@ -134,6 +134,21 @@ export function ScanPage() {
     dispatch({ type: "RESET" });
   };
 
+  const handleToggleResource = useCallback(async () => {
+    const next = {
+      ...state.resourceConfig,
+      unlimited: !state.resourceConfig.unlimited,
+    };
+    try {
+      await setResourceConfig(next);
+      dispatch({ type: "SET_RESOURCE_CONFIG", payload: next });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "设置资源限制失败，请稍后重试";
+      dispatch({ type: "SET_ERROR", payload: message });
+    }
+  }, [state.resourceConfig, dispatch]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] max-w-lg mx-auto">
       <div className="w-full bg-card/80 backdrop-blur-xl rounded-2xl p-8 shadow-lg border border-border">
@@ -147,9 +162,9 @@ export function ScanPage() {
         </p>
 
         {/* 进度条 */}
-        <div className="w-full bg-muted rounded-full h-3 mb-6 overflow-hidden">
+        <div className="w-full bg-muted h-0.5 mb-6 overflow-hidden">
           <div
-            className="bg-blue-600 h-full rounded-full transition-all duration-500"
+            className="bg-blue-600 h-full transition-all duration-[1500ms] ease-out"
             style={{ width: `${state.progressPercent}%` }}
           />
         </div>
@@ -157,6 +172,41 @@ export function ScanPage() {
         <p className="text-sm text-muted-foreground text-center mb-8">
           {state.progressMessage || "初始化扫描器…"}
         </p>
+
+        {/* CPU 限速开关 */}
+        <div className="flex items-center justify-between mb-5 rounded-xl border border-border bg-card/40 p-4">
+          <div className="flex-1 pr-4">
+            <p className="text-sm font-medium text-foreground">
+              {state.resourceConfig.unlimited
+                ? "不限速全量运行"
+                : "智能限速模式"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {state.resourceConfig.unlimited
+                ? "使用全部 CPU 性能，可能略微影响其他程序"
+                : "CPU 限制在 30% 以下，不影响您的正常使用"}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!state.resourceConfig.unlimited}
+            onClick={handleToggleResource}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+              !state.resourceConfig.unlimited
+                ? "bg-blue-600"
+                : "bg-muted-foreground/30"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                !state.resourceConfig.unlimited
+                  ? "translate-x-6"
+                  : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
 
         {/* 操作按钮 */}
         <div className="flex gap-3 justify-center">
@@ -184,7 +234,7 @@ export function ScanPage() {
         </div>
 
         {state.error && (
-          <p className="mt-4 text-sm text-red-500 text-center">{state.error}</p>
+          <p className="mt-4 text-sm text-center">{state.error}</p>
         )}
       </div>
     </div>

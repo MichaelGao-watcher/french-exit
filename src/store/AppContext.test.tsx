@@ -36,7 +36,7 @@ describe("AppContext reducer", () => {
     expect(result.current.state.error).toBeNull();
   });
 
-  it("SET_PAGE changes page and clears error", () => {
+  it("SET_PAGE changes page without clearing error", () => {
     const { result } = renderHook(() => useAppState(), { wrapper });
     act(() => {
       result.current.dispatch({ type: "SET_ERROR", payload: "some error" });
@@ -45,7 +45,7 @@ describe("AppContext reducer", () => {
       result.current.dispatch({ type: "SET_PAGE", payload: "results" });
     });
     expect(result.current.state.page).toBe("results");
-    expect(result.current.state.error).toBeNull();
+    expect(result.current.state.error).toBe("some error");
   });
 
   it("SET_SCAN_RESULTS replaces results and total", () => {
