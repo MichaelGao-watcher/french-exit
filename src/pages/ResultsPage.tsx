@@ -61,7 +61,6 @@ export function ResultsPage() {
   const [previewItem, setPreviewItem] = useState<TraceItem | null>(null);
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const hasAppliedDefaults = useRef(false);
   const PAGE_SIZE = 50;
 
   // 数据加载
@@ -90,30 +89,8 @@ export function ResultsPage() {
     }
   };
 
-  // 默认勾选逻辑（RULE-02 / RULE-03），仅在首次加载扫描结果时执行一次
-  useEffect(() => {
-    if (hasAppliedDefaults.current) return;
-    if (state.scanResults.length > 0 && state.decisions.size === 0) {
-      const defaultDecisions = new Map<string, Decision>();
-      const defaultSelected = new Set<string>();
-
-      state.scanResults.forEach((item) => {
-        if (item.category === "EnvVar") {
-          // RULE-02: 环境变量默认不勾选（不加入 decisions）
-          return;
-        }
-        const action = getDefaultAction(item);
-        if (action) {
-          defaultDecisions.set(item.id, { item_id: item.id, action });
-          defaultSelected.add(item.id);
-        }
-      });
-
-      hasAppliedDefaults.current = true;
-      dispatch({ type: "SET_DECISIONS", payload: defaultDecisions });
-      setSelectedIds(defaultSelected);
-    }
-  }, [state.scanResults, state.decisions.size, dispatch]);
+  // 默认勾选逻辑已移除：所有勾选必须由用户显式操作，防止误删
+  // RULE-02 / RULE-03 的默认行为改为仅在用户手动勾选时应用建议动作
 
   const filteredItems =
     activeCategory === "all"
@@ -173,6 +150,7 @@ export function ResultsPage() {
       const summaries = await getAllScanSummaries();
       const ids = new Set<string>();
       const newDecisions = new Map(state.decisions);
+      const newItems: TraceItem[] = [];
 
       summaries.forEach((summary) => {
         ids.add(summary.id);
@@ -181,6 +159,30 @@ export function ResultsPage() {
         if (action) {
           newDecisions.set(summary.id, { item_id: summary.id, action });
         }
+        // 将 summary 转为轻量 TraceItem 追加到 scanResults，供 ConfirmPage 展示
+        newItems.push({
+          id: summary.id,
+          name: summary.name,
+          path: null,
+          category: summary.category,
+          scanner_id: "",
+          size_bytes: null,
+          modified_at: null,
+          inferred: false,
+          risk_note: null,
+          suggested_action: summary.suggested_action,
+        });
+      });
+
+      // 合并到 scanResults（去重：已加载的完整数据优先保留）
+      const existingIds = new Set(state.scanResults.map((i) => i.id));
+      const mergedItems = [
+        ...state.scanResults,
+        ...newItems.filter((i) => !existingIds.has(i.id)),
+      ];
+      dispatch({
+        type: "SET_SCAN_RESULTS",
+        payload: { items: mergedItems, total: state.scanTotal },
       });
 
       setSelectedIds(ids);
@@ -192,11 +194,8 @@ export function ResultsPage() {
 
   const deselectAll = () => {
     setSelectedIds(new Set());
-    const newDecisions = new Map(state.decisions);
-    searchedItems.forEach((item) => {
-      newDecisions.delete(item.id);
-    });
-    dispatch({ type: "SET_DECISIONS", payload: newDecisions });
+    // 清除全部决策，不只当前页/搜索过滤后的数据
+    dispatch({ type: "SET_DECISIONS", payload: new Map() });
   };
 
   const markSelected = (action: "Delete" | "Preserve" | "Pack") => {

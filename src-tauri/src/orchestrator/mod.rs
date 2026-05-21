@@ -692,7 +692,10 @@ mod tests {
         use std::path::PathBuf;
 
         let scanner_registry = ScannerRegistry::new();
-        let temp_store = Arc::new(TempStore::new().unwrap());
+        let test_dir = std::env::temp_dir()
+            .join("french-exit")
+            .join(format!("test-{}", uuid::Uuid::new_v4()));
+        let temp_store = Arc::new(TempStore::with_root(test_dir).unwrap());
         let resource_controller = Arc::new(ResourceController::new());
         let eraser = Arc::new(DoDEraser::default());
         let delete_executor = crate::executor::delete::DeleteExecutor::new(eraser);

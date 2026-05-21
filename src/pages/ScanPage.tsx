@@ -17,10 +17,23 @@ export function ScanPage() {
   const progressPercentRef = useRef(state.progressPercent);
   progressPercentRef.current = state.progressPercent;
 
+  // 显示进度：保证只增不减，防止后端进度回跳导致进度条横跳
+  const displayPercentRef = useRef(0);
+
   // 进入扫描页时强制重置进度，避免第二次扫描残留上次进度
   useEffect(() => {
     dispatch({ type: "SET_PROGRESS", payload: { message: "准备扫描…", percent: 0 } });
   }, [dispatch]);
+
+  // 组件挂载时重置显示进度
+  useEffect(() => {
+    displayPercentRef.current = 0;
+  }, []);
+
+  // 每次渲染时，仅当新进度大于当前显示进度才更新
+  if (state.progressPercent > displayPercentRef.current) {
+    displayPercentRef.current = state.progressPercent;
+  }
 
   // 监听 Tauri Event 实时进度推送（替代轮询的主方案）
   useEffect(() => {
@@ -42,7 +55,7 @@ export function ScanPage() {
               percent:
                 event.total > 0
                   ? Math.round((event.current / event.total) * 100)
-                  : progressPercentRef.current,
+                  : displayPercentRef.current,
             },
           });
           break;
@@ -164,8 +177,8 @@ export function ScanPage() {
         {/* 进度条 */}
         <div className="w-full bg-muted h-0.5 mb-6 overflow-hidden">
           <div
-            className="bg-blue-600 h-full transition-all duration-[1500ms] ease-out"
-            style={{ width: `${state.progressPercent}%` }}
+            className="bg-blue-600 h-full transition-all duration-300 ease-out"
+            style={{ width: `${displayPercentRef.current}%` }}
           />
         </div>
 

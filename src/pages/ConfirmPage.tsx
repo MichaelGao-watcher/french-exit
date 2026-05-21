@@ -14,12 +14,30 @@ export function ConfirmPage() {
     const deleteItems: TraceItem[] = [];
     const packItems: TraceItem[] = [];
     const preserveItems: TraceItem[] = [];
-    for (const item of state.scanResults) {
-      const action = state.decisions.get(item.id)?.action;
-      if (action === "Delete") deleteItems.push(item);
-      else if (action === "Pack") packItems.push(item);
-      else if (action === "Preserve") preserveItems.push(item);
+
+    // 建立已加载完整数据的查找表
+    const itemMap = new Map(state.scanResults.map((i) => [i.id, i]));
+
+    // 遍历所有决策，确保数量不丢失
+    for (const [id, decision] of state.decisions) {
+      const item = itemMap.get(id) || {
+        id,
+        name: id,
+        path: null,
+        category: "FileSystem" as TraceCategory,
+        scanner_id: "",
+        size_bytes: null,
+        modified_at: null,
+        inferred: false,
+        risk_note: null,
+        suggested_action: decision.action,
+      };
+
+      if (decision.action === "Delete") deleteItems.push(item);
+      else if (decision.action === "Pack") packItems.push(item);
+      else if (decision.action === "Preserve") preserveItems.push(item);
     }
+
     return { deleteItems, packItems, preserveItems };
   }, [state.scanResults, state.decisions]);
 

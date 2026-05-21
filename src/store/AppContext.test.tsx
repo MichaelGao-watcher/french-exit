@@ -27,7 +27,7 @@ function makeItem(overrides: Partial<TraceItem> = {}): TraceItem {
 describe("AppContext reducer", () => {
   it("initial state should have correct defaults", () => {
     const { result } = renderHook(() => useAppState(), { wrapper });
-    expect(result.current.state.page).toBe("input");
+    expect(result.current.state.page).toBe("welcome");
     expect(result.current.state.scanResults).toEqual([]);
     expect(result.current.state.scanTotal).toBe(0);
     expect(result.current.state.decisions.size).toBe(0);
@@ -146,7 +146,7 @@ describe("AppContext reducer", () => {
     act(() => {
       result.current.dispatch({ type: "RESET" });
     });
-    expect(result.current.state.page).toBe("input");
+    expect(result.current.state.page).toBe("welcome");
     expect(result.current.state.scanResults).toHaveLength(0);
     expect(result.current.state.decisions.size).toBe(0);
   });

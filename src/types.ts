@@ -16,6 +16,7 @@ export type SessionId = string;
 
 export interface ScanResultSummary {
   id: TraceItemId;
+  name: string;
   category: TraceCategory;
   suggested_action: Action | null;
 }

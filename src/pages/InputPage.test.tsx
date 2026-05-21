@@ -31,12 +31,8 @@ describe("InputPage", () => {
     mockSetResourceConfig.mockClear();
   });
 
-  it("renders title and date picker", () => {
+  it("renders date picker and start button", () => {
     renderWithProvider(<InputPage />);
-    expect(screen.getByText(/French Exit/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/在撤离公用电脑前，安全处理您留下的痕迹/i),
-    ).toBeInTheDocument();
     expect(
       screen.getByText(/您开始使用这台电脑的时间/i),
     ).toBeInTheDocument();

@@ -10,6 +10,9 @@ test.describe("错误边界", () => {
   test("start_scan 失败时 InputPage 显示错误", async ({ page }) => {
     await page.goto("/");
 
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
+
     await page.evaluate(() => {
       window.__setTauriMockHandler__((cmd: string) => {
         if (cmd === "get_resource_config") {

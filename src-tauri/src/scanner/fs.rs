@@ -31,12 +31,35 @@ impl FileSystemScanner {
     /// 判断路径是否为系统关键目录（禁止扫描）
     fn is_system_path(path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_lowercase();
-        // 排除 Windows 系统目录
-        if path_str.starts_with("c:\\windows")
-            || path_str.starts_with("c:\\program files")
-            || path_str.starts_with("c:\\programdata")
-        {
-            return true;
+        let system_prefixes = [
+            "c:\\windows",
+            "c:\\program files",
+            "c:\\program files (x86)",
+            "c:\\programdata",
+            "c:\\system32",
+            "c:\\syswow64",
+            "c:\\$recycle.bin",
+            "c:\\recovery",
+            "c:\\boot",
+            "c:\\documents and settings",
+            "c:\\intel",
+            "c:\\perflogs",
+            "c:\\drivers",
+        ];
+        for prefix in &system_prefixes {
+            if path_str.starts_with(prefix) {
+                return true;
+            }
+        }
+        // 排除虚拟内存/休眠/交换文件
+        if let Some(name) = path.file_name() {
+            let name_lower = name.to_string_lossy().to_lowercase();
+            if matches!(
+                name_lower.as_str(),
+                "pagefile.sys" | "hiberfil.sys" | "swapfile.sys"
+            ) {
+                return true;
+            }
         }
         false
     }
@@ -287,6 +310,18 @@ impl FileSystemScanner {
 
         Ok(items)
     }
+
+    /// 枚举所有可用盘符（C: 到 Z:）
+    fn get_all_drives() -> Vec<PathBuf> {
+        let mut drives = Vec::new();
+        for letter in b'C'..=b'Z' {
+            let path = format!("{}:\\", letter as char);
+            if Path::new(&path).exists() {
+                drives.push(PathBuf::from(path));
+            }
+        }
+        drives
+    }
 }
 
 impl Scanner for FileSystemScanner {
@@ -314,18 +349,14 @@ impl Scanner for FileSystemScanner {
         let wechat_items = self.scan_wechat(ctx, progress)?;
         all_items.extend(wechat_items);
 
-        // 步骤 3：扫描 Desktop 和 Downloads
-        let scan_paths = [
-            ctx.user_home.join("Desktop"),
-            ctx.user_home.join("Downloads"),
-        ];
-
-        for path in &scan_paths {
-            if !path.exists() {
+        // 步骤 3：全盘扫描所有可用盘符
+        let drives = Self::get_all_drives();
+        for drive in &drives {
+            // 跳过系统盘根目录本身，但扫描其下非系统子目录
+            if Self::is_system_path(drive) {
                 continue;
             }
-
-            let items = self.scan_directory(ctx, path, progress)?;
+            let items = self.scan_directory(ctx, drive, progress)?;
             all_items.extend(items);
         }
 

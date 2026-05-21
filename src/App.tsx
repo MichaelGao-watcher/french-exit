@@ -10,6 +10,7 @@
 import { useEffect } from "react";
 import { AppProvider, useAppState } from "./store/AppContext";
 import { getResourceConfig } from "./api/commands";
+import { WelcomePage } from "./pages/WelcomePage";
 import { InputPage } from "./pages/InputPage";
 import { ScanPage } from "./pages/ScanPage";
 import { ResultsPage } from "./pages/ResultsPage";
@@ -29,6 +30,7 @@ const MOCK_REPORT: ExecutionReport = {
 };
 
 const PAGES: { key: string; label: string }[] = [
+  { key: "welcome", label: "欢迎" },
   { key: "input", label: "输入" },
   { key: "scanning", label: "扫描" },
   { key: "results", label: "结果" },
@@ -89,7 +91,42 @@ function AppContent() {
           </div>
         </div>
       )}
-      <main className="container mx-auto px-4 py-8">
+      {/* 大 Logo：欢迎页居中，离开时向上移动并消失 */}
+      <div
+        className={`
+          fixed z-50 font-semibold tracking-tight text-foreground select-none
+          transition-all duration-500 ease-out
+          ${state.page === "welcome"
+            ? "top-[32%] left-1/2 -translate-x-1/2 text-5xl opacity-100"
+            : "top-0 left-1/2 -translate-x-1/2 text-3xl opacity-0 pointer-events-none"
+          }
+        `}
+      >
+        French Exit
+      </div>
+
+      {/* 小 Logo：常驻左上角，欢迎页时隐藏 */}
+      <button
+        onClick={() => {
+          if (state.page !== "welcome") {
+            dispatch({ type: "SET_PAGE", payload: "welcome" });
+          }
+        }}
+        className={`
+          fixed z-50 font-semibold tracking-tight text-foreground select-none
+          transition-opacity duration-500 ease-out
+          ${state.page === "welcome"
+            ? "opacity-0 pointer-events-none"
+            : "opacity-100"
+          }
+          top-4 left-4 text-xl cursor-pointer hover:opacity-80
+        `}
+      >
+        French Exit
+      </button>
+
+      <main className={`container mx-auto px-4 ${state.page === "welcome" ? "py-8" : "pt-16 pb-8"}`}>
+        {state.page === "welcome" && <WelcomePage />}
         {state.page === "input" && <InputPage />}
         {state.page === "scanning" && <ScanPage />}
         {state.page === "results" && <ResultsPage />}

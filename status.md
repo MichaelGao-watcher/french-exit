@@ -145,6 +145,7 @@ e2e/
 | 2026-05-20 | 修复：纯黑色背景（CSS 变量纯黑/灰色调）；第二次扫描进度条残留（ScanPage 挂载重置 + 移除闭包依赖）；InputPage 新增 CPU 30%/全量 toggle；后端 lib.rs 启动时 apply_limits 真正生效 |
 | 2026-05-20 | 新增：ResultsPage "全选全部"按钮（后端 get_all_scan_summaries 轻量接口）；路径文本可点击打开所在文件夹；Vite 开发服务器作为前端预览方案；release 重新构建并分发 |
 | 2026-05-21 | 前端全面调整（8 项）：Bug/性能/DRY/UX/布局/文案/预览模式/骨架修复；GitHub 用户名批量更新（5 仓库 + 全局 Git 配置）；vitest 49 测全绿 |
+| 2026-05-21 | 审计清理 + 策略调整 + Bug 修复：C 盘清理（2.8GB + Temp 残留）；删除策略降级（DoD → 普通删除）；扫描范围扩展（Desktop/Downloads → 全盘 C:Z:）；移除默认自动勾选；修复 deselectAll 逻辑；修复 ConfirmPage 数据丢失（遍历 decisions 替代 scanResults）；后端测试 104 测全绿；AGENTS.md RULE-08 更新 |
 
 ---
 

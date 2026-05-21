@@ -121,14 +121,15 @@ describe("ResultsPage", () => {
     });
   });
 
-  it("does not auto-check EnvVar items (RULE-02)", async () => {
+  it("does not auto-check any items by default", async () => {
     const items = [
       makeItem({ id: "1", name: "TOKEN.env", category: "EnvVar", suggested_action: "Delete" }),
       makeItem({ id: "2", name: "file.txt", category: "FileSystem", suggested_action: "Delete" }),
+      makeItem({ id: "3", name: "wechat.db", category: "Chat", suggested_action: "DeleteOrPack" }),
     ];
     mockGetScanResults.mockResolvedValue({
       items,
-      total: 2,
+      total: 3,
       page: 1,
       page_size: 50,
     });
@@ -138,29 +139,10 @@ describe("ResultsPage", () => {
     });
 
     const checkboxes = screen.getAllByRole("checkbox");
-    // First checkbox is EnvVar → unchecked
+    // 默认不勾选任何项，防止误删
     expect(checkboxes[0]).not.toBeChecked();
-    // Second checkbox is FileSystem → checked by default
-    expect(checkboxes[1]).toBeChecked();
-  });
-
-  it("auto-checks items with suggested_action DeleteOrPack (RULE-03)", async () => {
-    const items = [
-      makeItem({ id: "1", name: "wechat.db", category: "Chat", suggested_action: "DeleteOrPack" }),
-    ];
-    mockGetScanResults.mockResolvedValue({
-      items,
-      total: 1,
-      page: 1,
-      page_size: 50,
-    });
-    renderWithProvider(<ResultsPage />);
-    await waitFor(() => {
-      expect(screen.getByText("wechat.db")).toBeInTheDocument();
-    });
-
-    const checkbox = screen.getByRole("checkbox");
-    expect(checkbox).toBeChecked();
+    expect(checkboxes[1]).not.toBeChecked();
+    expect(checkboxes[2]).not.toBeChecked();
   });
 
   it("toggles item selection on checkbox click", async () => {
@@ -179,19 +161,20 @@ describe("ResultsPage", () => {
     });
 
     const checkbox = screen.getByRole("checkbox");
-    expect(checkbox).toBeChecked();
+    // 默认不勾选
+    expect(checkbox).not.toBeChecked();
 
     const user = userEvent.setup();
-    // Uncheck
-    await user.click(checkbox);
-    await waitFor(() => {
-      expect(checkbox).not.toBeChecked();
-    });
-
-    // Check again
+    // Check
     await user.click(checkbox);
     await waitFor(() => {
       expect(checkbox).toBeChecked();
+    });
+
+    // Uncheck again
+    await user.click(checkbox);
+    await waitFor(() => {
+      expect(checkbox).not.toBeChecked();
     });
   });
 
@@ -213,9 +196,14 @@ describe("ResultsPage", () => {
 
     const user = userEvent.setup();
     const checkboxes = screen.getAllByRole("checkbox");
-    // Uncheck one first
+    // 默认都不勾选
+    expect(checkboxes[0]).not.toBeChecked();
+    expect(checkboxes[1]).not.toBeChecked();
+
+    // Check one first
     await user.click(checkboxes[0]);
-    await waitFor(() => expect(checkboxes[0]).not.toBeChecked());
+    await waitFor(() => expect(checkboxes[0]).toBeChecked());
+    expect(checkboxes[1]).not.toBeChecked();
 
     // Select all page
     await user.click(screen.getByRole("button", { name: /全选本页/i }));

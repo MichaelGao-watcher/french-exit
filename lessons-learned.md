@@ -250,6 +250,39 @@ new_url=$(echo "$old_url" | sed "s/$OLD_USER/$NEW_USER/")
 git remote set-url origin "$new_url"
 ```
 
+### 默认勾选是严重 UX 陷阱
+
+"方便用户"的默认勾选设计，在涉及删除操作的安全工具中是致命陷阱：
+
+- **事故经过**：ResultsPage 默认自动勾选所有扫描结果 → 用户点击"全选全部"（以为是全选当前页，实际是全选全部）→ 确认页看到"将删除 17,706 个文件"但未警觉 → 执行后大量文件丢失
+- **根因链**：默认勾选 × deselectAll 只清当前页 × ConfirmPage 遍历 scanResults（分页未加载完整）= 三重 bug 叠加
+- **教训**：涉及删除的安全工具，**默认安全 > 默认便利**。所有选择必须用户显式操作，任何"帮你选好"的设计都需反复审视
+
+### `deselectAll` 只清当前页不是真正的"取消全选"
+
+当系统支持"全选全部"（跨分页选中所有数据）时，取消全选必须清空**全部**选中状态，不能只操作当前可见页：
+
+- **原实现**：`deselectAll` 只遍历 `searchedItems`（当前页数据），从 `selectedIds` 中移除 → 其他分页的选中状态仍保留
+- **修复**：`deselectAll` 清空 `selectedIds` 为 `new Set()`，同时 `dispatch({ type: "SET_DECISIONS", payload: new Map() })` 清空全部 decisions
+- **教训**：跨分页操作时，"取消"必须与"全选"的对称——全选影响多大范围，取消就必须影响多大范围
+
+### 分页加载场景下，确认页必须遍历 `decisions` 而非 `scanResults`
+
+前端采用分页加载时，`scanResults` 只包含已加载的分页数据，而 `decisions` 是用户全部选择决策的完整集合：
+
+- **原实现**：ConfirmPage 遍历 `state.scanResults`，过滤出选中的项 → 分页未加载的项完全丢失
+- **修复**：遍历 `state.decisions`，每项在 `scanResults` 中查找详细信息，找不到时用 `name: id` 兜底
+- **教训**：在分页/懒加载架构中，**用户操作集合（decisions）是主数据源，展示数据（scanResults）是从属数据源**。确认/汇总逻辑必须基于操作集合
+
+### 开发预览工作流：Vite 服务器替代 `cargo tauri dev`
+
+Tauri 的 `cargo tauri dev` 无法在后台任务/SSH/无头环境中启动（需 Windows 桌面 GUI 上下文）。前端独立预览方案：
+
+- **启动**：`npm run dev`（Vite 服务器）→ 浏览器访问 `http://localhost:1420`
+- **优势**：HMR 热更新、即时预览、不依赖 Rust 编译
+- **限制**：IPC 调用会失败，需通过 mock 数据或调试导航面板 bypass
+- **完整功能验证**：仍需本地 `cargo tauri dev` 或双击 release `.exe`
+
 ---
 
 *最后更新：2026-05-21*

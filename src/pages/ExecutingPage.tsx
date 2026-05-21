@@ -18,12 +18,16 @@ export function ExecutingPage() {
   const hasStarted = useRef(false);
   const unlistenRef = useRef<(() => void) | null>(null);
 
+  // 显示进度：保证只增不减，防止后端进度回跳导致进度条横跳
+  const displayPercentRef = useRef(0);
+
   // 启动执行 + 监听进度
   useEffect(() => {
     if (hasStarted.current) return;
     hasStarted.current = true;
 
     // 重置进度显示
+    displayPercentRef.current = 0;
     dispatch({ type: "SET_PROGRESS", payload: { message: "准备执行…", percent: 0 } });
 
     // 纯前端预览模式：模拟执行进度
@@ -62,7 +66,7 @@ export function ExecutingPage() {
               percent:
                 event.total > 0
                   ? Math.round((event.current / event.total) * 100)
-                  : state.progressPercent,
+                  : displayPercentRef.current,
             },
           });
           break;
@@ -96,8 +100,8 @@ export function ExecutingPage() {
         {/* 进度条 */}
         <div className="w-full bg-muted h-0.5 mb-6 overflow-hidden">
           <div
-            className="bg-blue-600 h-full transition-all duration-[1500ms] ease-out"
-            style={{ width: `${state.progressPercent}%` }}
+            className="bg-blue-600 h-full transition-all duration-300 ease-out"
+            style={{ width: `${displayPercentRef.current}%` }}
           />
         </div>
 

@@ -82,16 +82,6 @@ export function InputPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">
       <div className="w-full max-w-lg">
-        {/* 标题区域 */}
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-semibold tracking-tight text-foreground mb-3">
-            French Exit
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            在撤离公用电脑前，安全处理您留下的痕迹
-          </p>
-        </div>
-
         {/* 输入卡片 */}
         <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-md p-8 shadow-sm">
           {/* 日期输入 */}

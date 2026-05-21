@@ -11,6 +11,9 @@ test.describe("ResultsPage 交互", () => {
     await page.goto("/");
     await setupStandardMock(page);
 
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
+
     await page.fill('#start-date', '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
@@ -48,6 +51,9 @@ test.describe("ResultsPage 交互", () => {
     await page.goto("/");
     await setupStandardMock(page);
 
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
+
     await page.fill('#start-date', '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
@@ -74,6 +80,9 @@ test.describe("ResultsPage 交互", () => {
   test("预览弹窗打开与关闭", async ({ page, emitEvent }) => {
     await page.goto("/");
     await setupStandardMock(page);
+
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
 
     await page.fill('#start-date', '2026-01-01');
     await page.click('button:has-text("开始扫描")');

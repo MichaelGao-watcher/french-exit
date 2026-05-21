@@ -20,7 +20,8 @@ test.describe("完整流程骨架", () => {
     // 2. 设置标准 mock
     await setupStandardMock(page, traceItems);
 
-    await expect(page.locator("h1")).toContainText("French Exit");
+    // 3. 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
     await expect(page.locator('button:has-text("开始扫描")')).toBeVisible();
 
     // 3. InputPage：选择入职日期并点击开始扫描
@@ -100,23 +101,29 @@ test.describe("完整流程骨架", () => {
 
     // 11. 点击"开始新的清理"返回首页
     await page.click('button:has-text("开始新的清理")');
-    await expect(page.locator("h1")).toContainText("French Exit");
+    await expect(page.locator('text=French Exit').first()).toBeVisible();
   });
 
   test("InputPage 日期校验：未选择日期时禁止启动", async ({ page }) => {
     await page.goto("/");
     await setupStandardMock(page);
 
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
+
     const startBtn = page.locator('button:has-text("开始扫描")');
     await expect(startBtn).toBeDisabled();
 
-    // 尝试点击（应该无反应）
-    await expect(page.locator("h1")).toContainText("French Exit");
+    // 尝试点击（应该无反应，页面保持在 InputPage）
+    await expect(page.locator('#start-date')).toBeVisible();
   });
 
   test("ScanPage 暂停与恢复", async ({ page, emitEvent }) => {
     await page.goto("/");
     await setupStandardMock(page);
+
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
 
     await page.fill('#start-date', '2026-01-01');
     await page.click('button:has-text("开始扫描")');

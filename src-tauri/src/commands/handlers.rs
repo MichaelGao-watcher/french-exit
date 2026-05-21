@@ -260,6 +260,7 @@ pub async fn get_all_scan_summaries(
         for item in page {
             all.push(crate::types::ScanResultSummary {
                 id: item.id,
+                name: item.name.clone(),
                 category: item.category,
                 suggested_action: item.suggested_action,
             });

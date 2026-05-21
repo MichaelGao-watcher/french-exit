@@ -148,6 +148,7 @@ pub struct ResourceConfig {
 #[ts(export)]
 pub struct ScanResultSummary {
     pub id: TraceItemId,
+    pub name: String,
     pub category: TraceCategory,
     pub suggested_action: Option<Action>,
 }

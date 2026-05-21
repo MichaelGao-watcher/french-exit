@@ -14,6 +14,7 @@ import type {
 
 /** 前端页面标识，与 orchestrator 状态机对应 */
 export type AppPage =
+  | "welcome"
   | "input"
   | "scanning"
   | "results"
@@ -57,7 +58,7 @@ type AppAction =
 
 /** 初始状态 */
 export const initialState: AppState = {
-  page: "input",
+  page: "welcome",
   startDate: "",
   scanId: null,
   scanResults: [],

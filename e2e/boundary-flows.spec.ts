@@ -11,6 +11,9 @@ test.describe("边界流程", () => {
     await page.goto("/");
     await setupStandardMock(page);
 
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
+
     // 默认检查 html 是否有 dark class
     const html = page.locator("html");
 
@@ -27,6 +30,9 @@ test.describe("边界流程", () => {
     await page.goto("/");
     await setupStandardMock(page);
 
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
+
     // 走完整流程到 ReportPage
     await page.fill('#start-date', '2026-01-01');
     await page.click('button:has-text("开始扫描")');
@@ -41,7 +47,10 @@ test.describe("边界流程", () => {
 
     // 点击重新开始
     await page.click('button:has-text("开始新的清理")');
-    await expect(page.locator("h1")).toContainText("French Exit");
+    await expect(page.locator('text=French Exit').first()).toBeVisible();
+
+    // 从欢迎页重新进入输入页
+    await page.click('button:has-text("开始使用")');
 
     // 日期输入应被清空
     const dateInput = page.locator('#start-date');
@@ -54,6 +63,9 @@ test.describe("边界流程", () => {
   test("空扫描结果：ResultsPage 显示空状态", async ({ page, emitEvent }) => {
     await page.goto("/");
     await setupStandardMock(page, []);
+
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
 
     await page.fill('#start-date', '2026-01-01');
     await page.click('button:has-text("开始扫描")');
@@ -69,6 +81,9 @@ test.describe("边界流程", () => {
   test("扫描失败：显示错误并保持可取消", async ({ page, emitEvent }) => {
     await page.goto("/");
     await setupStandardMock(page);
+
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
 
     await page.fill('#start-date', '2026-01-01');
     await page.click('button:has-text("开始扫描")');
@@ -92,6 +107,9 @@ test.describe("边界流程", () => {
     await page.goto("/");
     await setupStandardMock(page);
 
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
+
     await page.fill('#start-date', '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await expect(page.locator('text=正在扫描…')).toBeVisible();
@@ -100,7 +118,7 @@ test.describe("边界流程", () => {
     await page.click('button:has-text("取消")');
 
     // 返回 InputPage
-    await expect(page.locator("h1")).toContainText("French Exit");
+    await expect(page.locator('#start-date')).toBeVisible();
     await expect(page.locator('button:has-text("开始扫描")')).toBeDisabled();
   });
 });

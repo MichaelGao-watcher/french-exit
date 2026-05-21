@@ -156,6 +156,47 @@
 ```
 
 
+---
+
+### 2026-05-21 13:15-15:30
+
+**目标**：审计清理 + 策略调整 + 前端 Bug 修复（误删事故后续）
+
+**实际完成**：
+- ✅ 构建产物 + 后端测试：`cargo test --lib` 104 测全绿（新增 1 测修复 flaky）
+- ✅ 修复 flaky test：`orchestrator::tests::test_transition_to_invalid` TempStore 目录改用 UUID 避免 PID 竞争
+- ✅ C 盘审计清理：删除 `C:/french-exit`（2.8GB 副本）+ `Temp/french-exit/`（16 个 PID 残留目录）
+- ✅ Bug 修复 #1：ResultsPage → ConfirmPage 数据丢失
+  - `ScanResultSummary` 增加 `name` 字段
+  - ConfirmPage 遍历 `state.decisions` 而非 `state.scanResults`，分页未加载项也能统计
+- ✅ Bug 修复 #2：移除默认自动勾选（防止误删事故重演）
+  - 删除 `hasAppliedDefaults` useRef 和默认勾选 useEffect
+  - 所有选择需用户显式操作
+- ✅ Bug 修复 #3：`deselectAll` 清空全部 `decisions`（`new Map()`），不再只遍历 `searchedItems`
+- ✅ 删除策略降级：DoD 安全擦除（不可恢复）→ 普通删除（可恢复）
+  - `delete.rs` 中调用 `std::fs::remove_file`/`remove_dir_all`
+  - DoD 完整代码保留在 `secure_erase.rs`，可一键恢复
+- ✅ 扫描范围扩展：Desktop/Downloads 限定 → 全盘扫描（枚举 C: 到 Z:）
+  - `fs.rs` 新增 `get_all_drives()` 和 `is_system_path()` 保护
+- ✅ AGENTS.md RULE-08 更新：从"仅限 Desktop/Downloads"改为"全盘扫描，系统目录受保护"
+- ✅ 前端 vitest 适配更新（取消全选测试逻辑调整，7 tests pass）
+
+**关键决策**：
+- **删除策略降级**：从 DoD 安全擦除改为普通删除。理由：误删 17,706 个文件的事故已造成实际损失，普通删除至少给用户"回收站还原"的最后机会。DoD 代码完整保留，未来可恢复。
+- **扫描范围扩展**：全盘扫描 + 系统目录保护。理由：用户已确认无法区分工作/私人，按类型列出更符合实际；全盘扫描能发现更多个人痕迹。
+- **移除默认勾选**：默认全部不勾选。理由：默认勾选是导致误删事故的三重根因之一（默认勾选 × deselectAll 只清当前页 × ConfirmPage 遍历 scanResults）。
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：误删 17,706 个文件，桌面文件丢失但非关键（浏览器数据可自动恢复）→ 根因分析：三重 bug 叠加。已全部修复。
+- **阻碍**：plan mode 连续触发（每次读取文件自动进入 plan mode）→ 根因：Kimi CLI 的设计导致每次文件读取都触发 plan mode。解决：用户直接给出具体指令跳过 plan mode。
+- **阻碍**：`deselectAll` 只清当前页，全选全部后取消只能取消当前页 → 根因：实现时只考虑了"当前页视图"而非"全局决策集合"。解决：改为清空全部 decisions Map。
+- **阻碍**：ConfirmPage 统计数量与实际选中严重不符 → 根因：遍历 `scanResults` 而非 `decisions`，分页未加载的项完全丢失。解决：改为遍历 decisions，在 scanResults 中查找详细信息，找不到时兜底。
+
+**遗留问题 / 下轮开始点**：
+- 全盘扫描性能：结果量可能从几千增至几十万，扫描时间分钟级，前端分页承载能力需验证
+- release/ 中 exe 尚未重新构建（前端变更后建议重新打包）
+- 用户如需继续调整 UI/UX，直接给出具体修改指令
+
 ### 2026-05-20 10:28-10:35
 
 **目标**：从 `vibe-coding-project-sop` 读取最新 SOP 更新并采纳到 French Exit

@@ -34,18 +34,22 @@ impl Executor for DeleteExecutor {
             | TraceCategory::DevTools => {
                 if let Some(ref path) = item.path {
                     if path.exists() {
+                        // 普通删除（非安全擦除），可通过数据恢复软件恢复
                         if path.is_file() {
-                            // 对文件调用安全擦除
-                            self.secure_eraser.erase_file(path)?;
+                            std::fs::remove_file(path)
+                                .map_err(|e| BackendError::IoError(e))?;
                         } else if path.is_dir() {
-                            // 对目录调用安全擦除（递归处理内部文件后删除空目录）
-                            self.secure_eraser.erase_directory(path)?;
+                            std::fs::remove_dir_all(path)
+                                .map_err(|e| BackendError::IoError(e))?;
                         }
                         Ok(ExecutionResult {
                             item_id: item.id.clone(),
                             action: Action::Delete,
                             status: ExecutionStatus::Success,
-                            detail: Some(format!("已安全删除: {}", path.display())),
+                            detail: Some(format!(
+                                "已删除: {}",
+                                path.display()
+                            )),
                         })
                     } else {
                         // 路径不存在，无需操作，标记为跳过
