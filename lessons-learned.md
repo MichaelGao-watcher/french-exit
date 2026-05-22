@@ -120,7 +120,87 @@
 # [项目名] — 经验总结
 
 ## 技术经验
-| # | 经验 | 来源模块 |
+| # | 经验 | 来源模块 | | 纯 HTML+CSS+JS 项目无需 npm，双击 `index.html` 即可预览，但涉及 Web Worker（如 Stockfish）时必须启 HTTP 服务器 [来源:blindfold-chess @2026-05-22] | EngineModule |
+| | 手写 IIFE 模块时，用 `window.ModuleName = Module` 暴露 API，内部私有变量用下划线前缀，避免全局泄漏 [来源:blindfold-chess @2026-05-22] | 所有 js/*.js |
+| | 浏览器集成测试用 TestRunner（自定义极简框架），保持与 Node 测试同一套断言 API，降低切换成本 [来源:blindfold-chess @2026-05-22] | docs/tests/ |
+| | Canvas 图表渲染在浏览器中测试，Node 环境用 Mock 2D context 跳过绘制验证，各测其责 [来源:blindfold-chess @2026-05-22] | StatsModule |
+| | PGN 解析器对空/无效输入返回 `[]`（空数组）而非 `null`，调用方需区分"无走法"和"解析失败" [来源:blindfold-chess @2026-05-22] | ReplayModule |
+| | `cloneNode(true)` 替换含 SVG 的按钮会导致 SVG 渲染异常（显示不完整）；移除事件监听器应优先用 `removeEventListener` + 命名函数，避免替换 DOM 元素 [来源:blindfold-chess @2026-05-22] | SettingsModule |
+| | 匿名事件监听器无法被后续代码移除；需要动态解除绑定的监听器必须用命名函数（暴露到 `window` 或模块内部变量） [来源:blindfold-chess @2026-05-22] | common.js / settings.js |
+| | 屏幕切换导航不能只隐藏上一个屏幕，必须遍历 `.screen` 全部隐藏后再显示目标，否则多层屏幕重叠 [来源:blindfold-chess @2026-05-22] | 全局导航 |
+| | SVG path 中密集参数（如 `a2 2 0 0 1-2.83 0`）在某些浏览器中可能解析异常，命令与参数间保留空格更稳妥 [来源:blindfold-chess @2026-05-22] | index.html SVG |
+| | `document` 级事件监听器若引用了某个 DOM 元素，该元素被替换后监听器仍会按旧引用判断，导致逻辑错误（如点击新按钮被误判为"点击外部"） [来源:blindfold-chess @2026-05-22] | settings.js / common.js |
+| | 项目文档结构会随时间进化，"存档"或"恢复"操作前应先 `ls`/`glob` 确认当前文件系统现状，避免按历史路径写入已不存在的文件 [来源:blindfold-chess @2026-05-22] | 文档维护 |
+| | **UI 布局/样式不要猜测用户意图**：候选走法开关经历了 5 次位置/样式反复（设置面板 → header 图标 → 滑动开关 → 圆形按钮+标签 → 纯文字 → 下移），每次修改后用户都不满意；应在设计阶段出草图或描述供用户确认，再编码 [来源:blindfold-chess @2026-05-22] | BlindfoldModule UI |
+| | **引擎候选走法的调用时机决定产品逻辑正确性**：用户走完后立即 `goMultiPv` 分析的是对手（黑方）局面，展示的是"对手会怎么走"；若要提示用户，必须在引擎执行完走法后、轮到白方时再调用 `goMultiPv` [来源:blindfold-chess @2026-05-22] | EngineModule / BlindfoldModule |
+| | **引擎返回 UCI（e2e4），用户界面必须用 SAN（e4）**：`goMultiPv` 回调中的 `move` 是 UCI 坐标格式，展示前需通过 `_game.moves({verbose:true})` 映射为 SAN，否则用户无法阅读 [来源:blindfold-chess @2026-05-22] | BlindfoldModule |
+| | **静态 HTML 结构与动态渲染模块的 DOM 冲突**：`index.html` 中预置了完整棋盘结构（含行/列标注），而 `BoardRenderer.create()` 会在容器内重新创建完整结构，导致两组行标注同时存在；应只保留空容器让渲染器全权负责 [来源:blindfold-chess @2026-05-22] | BoardRenderer / index.html |
+| | **删除功能必须同步删除对应测试**：移除 `showHints` / `multiPvSetting` 后，`test-settings-node.js` 中相关测试会立即失败；功能清理和测试清理应视为同一任务 [来源:blindfold-chess @2026-05-22] | 测试维护 |
+| | **焦点管理是盲棋产品的核心体验**：进入对局自动 `input.focus()`、引擎走完后恢复焦点、全局 Enter 键将焦点拉回输入框——三者缺一不可，否则用户被迫频繁使用鼠标 [来源:blindfold-chess @2026-05-22] | BlindfoldModule UX |
+| | **i18n 分散架构必然导致翻译遗漏**：当项目同时存在"全局字典 + 模块私有字典 + 硬编码"三种翻译方式时，新增功能几乎必然漏掉其中一种或多种。唯一可持续的方案是"单一字典源" [来源:blindfold-chess @2026-05-22] | 全站 i18n |
+| | **JS 中的硬编码人类可读字符串是翻译遗漏的重灾区**：HTML 中的 `data-i18n` 至少能被肉眼扫描到，但 JS 逻辑里直接写的 `"Time Up!"`、`"✓ 已复制"` 没有显式标记，切换语言时完全失效 [来源:blindfold-chess @2026-05-22] | common.js / coordinate.js / blindfold.js |
+| | **复制粘贴是 i18n 错误的常见来源**：将中文值直接粘贴进英文字典（如 `boardToggle: "显示棋盘"`），或反之，属于低级但高频的疏忽 [来源:blindfold-chess @2026-05-22] | common.js |
+| | **模块内部字典若从不主动更新 DOM，则纯属冗余**：welcome.js 有 `_i18n` 和 `_t()`，但从不调用，完全依赖 common.js 的 `updateTexts()`。这种"假私有字典"不仅没用，还会给维护者造成"这里已经翻译了"的错觉 [来源:blindfold-chess @2026-05-22] | welcome.js |
+| | **settings.js 的独立字典与 common.js 的全局扫描存在竞争**：settings panel 的元素带 `data-i18n`，settings.js 自己 `_updateAllTexts()` 会覆盖，但 common.js 的 `updateTexts()` 也会扫到，如果 common.js 缺键，用户会看到 key 名闪一下才被正确文本覆盖 [来源:blindfold-chess @2026-05-22] | settings.js / common.js |
+| | **已删除的 JS 文件若不从 index.html 移除引用，会导致 404**：game.js 删除后 index.html 仍 `<script src="js/game.js">`，浏览器控制台会报错。功能清理和引用清理必须是同一任务 [来源:blindfold-chess @2026-05-22] | 代码清理 |
+| | **Node 测试不对 UI 文本做断言，无法捕获翻译错误**：`test-stats-node.js` 和 `test-replay-node.js` 只测 API 形状和数值，不检查按钮文字、提示语等人类可读内容。翻译质量必须靠人工检查或专门的 UI 测试覆盖 [来源:blindfold-chess @2026-05-22] | 测试策略 |
+| | **删除生产代码的 fallback 函数前，必须先评估测试环境是否提供了该依赖**：`blindfold.js`/`coordinate.js` 的 `_t()` fallback 在测试中默默提供英文文本，删除后所有相关测试立即 `ReferenceError: t is not defined`。架构统一重构必须同时改代码+测试，只改一边会导致测试雪崩 [来源:blindfold-chess @2026-05-22] | 全站 i18n |
+| | **`localStorage` mock 必须支持 `setItem` 持久化**：测试中 `global.localStorage = { getItem: () => null }` 会让 `t()` 永远读取默认语言，导致语言切换测试失效。可写的 localStorage mock 是 i18n 测试的前提 [来源:blindfold-chess @2026-05-22] | 测试基础设施 |
+| | **全局 `updateTexts()` 与模块私有 `_updateXxx()` 可能存在 DOM 竞争**：`settings.js` 的 `_updateLangValue()` 显示"当前语言"，common.js 的 `updateTexts()` 显示"目标语言"，两者操作同一 DOM 元素。测试必须验证最终渲染结果，而非中间状态 [来源:blindfold-chess @2026-05-22] | settings.js / common.js |
+| | **配置类设置项用「弹窗选择」优于「循环切换」**：循环切换隐藏了全部选项，用户不知道有哪些风格、当前在第几个；弹窗一次展示所有选项+预览，认知负荷更低，操作确定性更强 [来源:blindfold-chess @2026-05-22] | SettingsModule UI |
+| | **`cloneNode(true)` 无法移除旧事件监听器，它只是复制了 DOM 结构**：`_rebind()` 用 clone+replace 来"换绑"事件，但如果匿名监听器无法被引用，clone 后的新元素上旧的监听器仍然通过作用域链引用着旧变量。真正安全的解绑是 `removeEventListener` + 保存引用 [来源:blindfold-chess @2026-05-22] | settings.js |
+| | **UI 风格不一致的根因通常是「硬编码颜色」**：盲棋练习和坐标练习的棋盘颜色不一致，是因为两者各自硬编码了不同色值。引入统一的「棋盘风格配置源」后，所有棋盘自动同步，消除了不一致的根因 [来源:blindfold-chess @2026-05-22] | BoardRenderer / coordinate.js |
+| | **功能入口迁移需要同步更新「正向路径」和「反向路径」**：将复盘从首页移到设置面板，不仅要添加新入口（设置面板点击），还要移除旧入口（首页卡片 + welcome.js 绑定），否则用户会在两个地方看到同一功能，或测试断言旧路径仍然有效 [来源:blindfold-chess @2026-05-22] | WelcomeModule / index.html |
+| | **数据层的双语字段与代码层的硬编码分支是两个问题**：`games.js` 的 `titleZh/titleEn` 是数据内容，保留双语字段合理；但 `replay.js` 中的三元组 `lang === 'en' ? game.titleEn : game.titleZh` 是代码硬编码分支，应通过数据结构改造消除。区分"数据双语"和"代码分支"可避免过度重构 [来源:blindfold-chess @2026-05-22] | replay.js / data/games.js |
+| | **测试中断言的具体文本值是重构的敏感点**：当翻译源从"模块内联字典"切换到"全局字典"时，即使语义相同，具体字符串也可能不同（如 `"再来一局"` → `"再玩一局"`）。重构前应先审计测试中的文本断言，预估需要调整的范围 [来源:blindfold-chess @2026-05-22] | 测试维护 |
+| | **数据文件中的引号嵌套是极易被忽视的语法陷阱**：`data/games.js` 中的 `'Rubinstein's Immortal'` 在 Node 测试环境中不会触发（因为该文件仅被浏览器加载），但在真实浏览器中会抛出 `SyntaxError` 并阻断后续脚本执行 [来源:blindfold-chess @2026-05-22] | data/games.js |
+| | **Node 测试全过 ≠ 浏览器表现正常**：`data/games.js` 的语法错误在 Node 测试中被完全绕过（Node 测试不加载该文件），必须用 headless 浏览器（playwright）才能捕获 [来源:blindfold-chess @2026-05-22] | 测试策略 |
+| | **playwright 是定位浏览器特有 bug 的有效手段**：通过 `page.add_init_script` 注入错误监听器 + `page.on('pageerror')`，可以精确定位到出错的文件、行号和列号 [来源:blindfold-chess @2026-05-22] | 调试工具 |
+| | **通用配置层设计能降低新增模式的边际成本**：将"选择阵营 + 难度"抽象为 `gameSetupScreen`，由 `WelcomeModule` 维护 `_pendingMode`，新增对局模式时只需加一行 `else if` 分发逻辑，无需重复造 DOM/CSS [来源:blindfold-chess @2026-05-22] | 架构设计 |
+| | **向后兼容接口设计能减少重构的连锁反应**：`BlindfoldModule.init('medium')` 继续工作，内部映射为 `{side:'w', elo:1400}`，所有旧测试和外部调用点无需改动 [来源:blindfold-chess @2026-05-22] | API 设计 |
+| | 浏览器集成测试阶段发现 welcome.js / replay.js / stats.js 的 DOM 事件绑定遗漏 [来源:blindfold-chess @2026-05-22] |  |
+| | Node 测试覆盖逻辑，浏览器测试覆盖 DOM 集成，两者互补 [来源:blindfold-chess @2026-05-22] |  |
+| | `AGENTS.md` 定义触发词和行为约束，`STATE.md`（现 status.md）记录动态进度，分工明确 [来源:blindfold-chess @2026-05-22] |  |
+| | 每批次开发完成后同步更新进度文档，避免新会话迷路 [来源:blindfold-chess @2026-05-22] |  |
+| | **手工构建100条结构化数据不现实**：经典棋局的 PGN 分散在各网站，无统一免费 API；手动录入100盘完整 PGN 工作量巨大且易出错 [来源:blindfold-chess @2026-05-22] |  |
+| | **WriteFile 不适合超大特殊字符内容**：含大量引号/换行的长文本会因 JSON 转义失败；应改用本地 Python/Node 脚本生成，或提前准备好数据文件 [来源:blindfold-chess @2026-05-22] |  |
+| | **Shell here-document 在 Windows git bash 中不可靠**：含引号的多行复杂脚本会被截断或解析错误；应先 `WriteFile` 写脚本，再 `Shell` 执行 [来源:blindfold-chess @2026-05-22] |  |
+| | **翻译检查必须是独立任务，不能依赖"开发时顺手做"**：本次检查发现 25+ 处遗漏，分布在 HTML、JS 字典、硬编码三个层面。分批迭代时，每新增一个 `data-i18n` 或用户可见字符串，必须同步到唯一字典源，否则必然遗漏。 [来源:blindfold-chess @2026-05-22] |  |
+| | **涉及 7+ 文件读改测的架构重构，应新开会话执行**：当前会话在查漏补缺后已承载大量上下文，继续塞进系统性重构容易触发窗口压缩，导致信息丢失。 [来源:blindfold-chess @2026-05-22] |  |
+| | GitHub Pages 国内访问需代理；unpkg CDN 加载 Stockfish 可能超时，需考虑离线备选方案 [来源:blindfold-chess @2026-05-22] |  |
+| | Windows 路径在 git bash / Node.js / cmd 中转义规则不同，写跨平台脚本时优先用正斜杠或 `path.join` [来源:blindfold-chess @2026-05-22] |  |
+| | TAG:build-env TAG:testing [来源:vibe-coding-project-sop @2026-05-22] | INFO | 纯 HTML+CSS+JS 项目无需 npm，双击 `index.html` 即可预览，但涉及 Web Worker（如 Stockfish）时必须启 HTTP 服务器 [来源:blindfold-chess @2026-05-21] | EngineModule |
+| | TAG:dom TAG:api-design [来源:vibe-coding-project-sop @2026-05-22] | WARNING | 手写 IIFE 模块时，用 `window.ModuleName = Module` 暴露 API，内部私有变量用下划线前缀，避免全局泄漏 [来源:blindfold-chess @2026-05-21] | 所有 js/*.js |
+| | TAG:data TAG:api-design [来源:vibe-coding-project-sop @2026-05-22] | INFO | PGN 解析器对空/无效输入返回 `[]`（空数组）而非 `null`，调用方需区分"无走法"和"解析失败" [来源:blindfold-chess @2026-05-21] | ReplayModule |
+| | TAG:dom TAG:ux [来源:vibe-coding-project-sop @2026-05-22] | WARNING | 屏幕切换导航不能只隐藏上一个屏幕，必须遍历 `.screen` 全部隐藏后再显示目标，否则多层屏幕重叠 [来源:blindfold-chess @2026-05-21] | 全局导航 |
+| | TAG:ai-workflow [来源:vibe-coding-project-sop @2026-05-22] | INFO | 项目文档结构会随时间进化，"存档"或"恢复"操作前应先 `ls`/`glob` 确认当前文件系统现状，避免按历史路径写入已不存在的文件 [来源:blindfold-chess @2026-05-21] | 文档维护 |
+| | TAG:i18n [来源:vibe-coding-project-sop @2026-05-22] | CRITICAL | **i18n 分散架构必然导致翻译遗漏**：当项目同时存在"全局字典 + 模块私有字典 + 硬编码"三种翻译方式时，新增功能几乎必然漏掉其中一种或多种。唯一可持续的方案是"单一字典源" [来源:blindfold-chess @2026-05-21] | 全站 i18n |
+| | TAG:i18n TAG:architecture [来源:vibe-coding-project-sop @2026-05-22] | WARNING | **模块内部字典若从不主动更新 DOM，则纯属冗余**：welcome.js 有 `_i18n` 和 `_t()`，但从不调用，完全依赖 common.js 的 `updateTexts()`。这种"假私有字典"不仅没用，还会给维护者造成"这里已经翻译了"的错觉 [来源:blindfold-chess @2026-05-21] | welcome.js |
+| | TAG:i18n TAG:dom [来源:vibe-coding-project-sop @2026-05-22] | WARNING | **settings.js 的独立字典与 common.js 的全局扫描存在竞争**：settings panel 的元素带 `data-i18n`，settings.js 自己 `_updateAllTexts()` 会覆盖，但 common.js 的 `updateTexts()` 也会扫到，如果 common.js 缺键，用户会看到 key 名闪一下才被正确文本覆盖 [来源:blindfold-chess @2026-05-21] | settings.js / common.js |
+| | TAG:testing TAG:architecture [来源:vibe-coding-project-sop @2026-05-22] | CRITICAL | **删除生产代码的 fallback 函数前，必须先评估测试环境是否提供了该依赖**：架构统一重构必须同时改代码+测试，只改一边会导致测试雪崩 [来源:blindfold-chess @2026-05-21] | 全站 i18n |
+| | TAG:dom TAG:i18n [来源:vibe-coding-project-sop @2026-05-22] | WARNING | **全局 `updateTexts()` 与模块私有 `_updateXxx()` 可能存在 DOM 竞争**：两者操作同一 DOM 元素。测试必须验证最终渲染结果，而非中间状态 [来源:blindfold-chess @2026-05-21] | settings.js / common.js |
+| | TAG:ux TAG:architecture [来源:vibe-coding-project-sop @2026-05-22] | WARNING | **UI 风格不一致的根因通常是「硬编码颜色」**：引入统一的「棋盘风格配置源」后，所有棋盘自动同步，消除不一致的根因 [来源:blindfold-chess @2026-05-21] | BoardRenderer / coordinate.js |
+| | TAG:data TAG:architecture [来源:vibe-coding-project-sop @2026-05-22] | INFO | **数据层的双语字段与代码层的硬编码分支是两个问题**：区分"数据双语"和"代码分支"可避免过度重构 [来源:blindfold-chess @2026-05-21] | replay.js / data/games.js |
+| | TAG:data TAG:build-env [来源:vibe-coding-project-sop @2026-05-22] | WARNING | **数据文件中的引号嵌套是极易被忽视的语法陷阱**：在真实浏览器中会抛出 `SyntaxError` 并阻断后续脚本执行 [来源:blindfold-chess @2026-05-21] | data/games.js |
+| | TAG:testing TAG:debugging [来源:vibe-coding-project-sop @2026-05-22] | INFO | **playwright 是定位浏览器特有 bug 的有效手段**：通过 `page.add_init_script` 注入错误监听器 + `page.on('pageerror')`，可以精确定位到出错的文件、行号和列号 [来源:blindfold-chess @2026-05-21] | 调试工具 |
+| | TAG:testing TAG:dom [来源:vibe-coding-project-sop @2026-05-22] | INFO | 浏览器集成测试阶段发现 welcome.js / replay.js / stats.js 的 DOM 事件绑定遗漏 [来源:blindfold-chess @2026-05-21] | |
+| | TAG:cross-platform TAG:ai-workflow [来源:vibe-coding-project-sop @2026-05-22] | WARNING | **Shell here-document 在 Windows git bash 中不可靠**：含引号的多行复杂脚本会被截断或解析错误；应先 `WriteFile` 写脚本，再 `Shell` 执行 [来源:blindfold-chess @2026-05-21] | |
+| | TAG:i18n TAG:ai-workflow [来源:vibe-coding-project-sop @2026-05-22] | WARNING | **翻译检查必须是独立任务，不能依赖"开发时顺手做"**：本次检查发现 25+ 处遗漏，分布在 HTML、JS 字典、硬编码三个层面 [来源:blindfold-chess @2026-05-21] | |
+| | TAG:state-management [来源:vibe-coding-project-sop @2026-05-22] | CRITICAL | **绝对不要**在 `setState` 的 updater 函数内部调用 `dispatch()` 或其他 setState，会触发 React "渲染时更新" 警告 [来源:french-exit @2026-05-21] | `ResultsPage.tsx` |
+| | TAG:cross-platform TAG:build-env [来源:vibe-coding-project-sop @2026-05-22] | CRITICAL | 中文路径 + MinGW = 链接器失败。解决方案：复制到纯 ASCII 路径（如 `/c/french-exit`）后编译 [来源:french-exit @2026-05-21] | |
+| | TAG:testing TAG:cross-platform [来源:vibe-coding-project-sop @2026-05-22] | INFO | **`#[cfg(not(test))]` 隔离问题代码**是零副作用的修复手法：release 构建完全不受影响，测试逻辑移至独立模块继续跑 [来源:french-exit @2026-05-21] | |
+| | TAG:data TAG:performance [来源:vibe-coding-project-sop @2026-05-22] | WARNING | 不要一次性加载所有完整 `TraceItem` 到前端（内存 + DOM 渲染压力大） [来源:french-exit @2026-05-21] | |
+| | TAG:architecture TAG:data [来源:vibe-coding-project-sop @2026-05-22] | INFO | 正确做法：后端提供**轻量摘要接口**（只返回 id + category + suggested_action），前端用它批量生成 decisions [来源:french-exit @2026-05-21] | |
+| | TAG:pagination TAG:architecture [来源:vibe-coding-project-sop @2026-05-22] | WARNING | 用户实际浏览仍按分页，但"全选全部"走轻量接口，两者解耦 [来源:french-exit @2026-05-21] | |
+| | TAG:pagination TAG:state-management TAG:security [来源:vibe-coding-project-sop @2026-05-22] | CRITICAL | **事故经过**：ResultsPage 默认自动勾选所有扫描结果 → 用户点击"全选全部"（以为是全选当前页，实际是全选全部）→ 确认页看到"将删除 17,706 个文件"但未警觉 → 执行后大量文件丢失 [来源:french-exit @2026-05-21] | |
+| | TAG:security TAG:ux [来源:vibe-coding-project-sop @2026-05-22] | CRITICAL | **教训**：涉及删除的安全工具，**默认安全 > 默认便利**。所有选择必须用户显式操作，任何"帮你选好"的设计都需反复审视 [来源:french-exit @2026-05-21] | |
+| | 测试驱动开发能在手工测试无法触及的边界条件下发现 bug（如"恰好取消所有勾选"触发死循环）[来源:french-exit @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
+| | `AGENTS.md` 定义触发词和行为约束，`status.md` 记录动态进度，两者分工明确，新会话读 2 份文件即可开工 [来源:french-exit @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
+| | 涉及 7+ 文件读改测的架构重构，应新开会话执行，避免上下文压缩导致信息丢失 [来源:blindfold-chess @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
+| | 中文路径 + MinGW = 链接器失败。解决方案：复制到纯 ASCII 路径后编译 [来源:french-exit @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
+| | `cargo check --lib` 不需要链接，可以在中文路径直接跑；`cargo test --no-run` 同理 [来源:french-exit @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
+| | Windows 路径在 git bash / Node.js / cmd 中转义规则不同，写跨平台脚本时优先用正斜杠或 `path.join` [来源:blindfold-chess @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
+|
 
 ## 流程经验
 ### 问题发现

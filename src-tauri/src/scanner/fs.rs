@@ -368,6 +368,19 @@ impl Scanner for FileSystemScanner {
 mod tests {
     use super::*;
     use std::io::Write;
+    use crate::types::{Action, ScanContext};
+    use crate::scanner::ScanProgress;
+    use chrono::Duration;
+
+    fn make_scan_ctx(temp_dir: &tempfile::TempDir, start_date: NaiveDate) -> ScanContext {
+        ScanContext {
+            start_date,
+            user_home: temp_dir.path().to_path_buf(),
+            temp_dir: temp_dir.path().to_path_buf(),
+        }
+    }
+
+    fn no_op_progress(_p: ScanProgress) {}
 
     #[test]
     fn test_fs_scanner_trait_compiles() {
@@ -410,5 +423,130 @@ mod tests {
         let id2 = FileSystemScanner::generate_file_id(path);
         assert_eq!(id1, id2);
         assert!(id1.starts_with("fs-"));
+    }
+
+    #[test]
+    fn test_scan_directory_finds_files() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dir = temp_dir.path().join("scan-target");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join("file1.txt"), "a").unwrap();
+        std::fs::write(dir.join("file2.txt"), "b").unwrap();
+        std::fs::create_dir(dir.join("subdir")).unwrap();
+        std::fs::write(dir.join("subdir").join("nested.txt"), "c").unwrap();
+
+        let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_directory(&ctx, &dir, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 3, "应扫描到 3 个文件");
+        let names: std::collections::HashSet<_> = items.iter().map(|i| i.name.as_str()).collect();
+        assert!(names.contains("file1.txt"));
+        assert!(names.contains("file2.txt"));
+        assert!(names.contains("nested.txt"));
+
+        for item in &items {
+            assert_eq!(item.category, TraceCategory::FileSystem);
+            assert_eq!(item.scanner_id, "scanner-fs");
+            assert!(item.size_bytes.unwrap() > 0);
+            assert_eq!(item.suggested_action, Some(Action::DeleteOrPack));
+            assert!(item.path.as_ref().unwrap().to_string_lossy().contains("scan-target"));
+        }
+    }
+
+    #[test]
+    fn test_scan_directory_skips_hidden_and_system_files() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dir = temp_dir.path().join("scan-target");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join("normal.txt"), "a").unwrap();
+        std::fs::write(dir.join(".hidden"), "b").unwrap();
+        std::fs::write(dir.join("pagefile.sys"), "c").unwrap();
+
+        let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_directory(&ctx, &dir, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "normal.txt");
+    }
+
+    #[test]
+    fn test_scan_directory_date_filter_excludes_old_files() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dir = temp_dir.path().join("scan-target");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join("file.txt"), "a").unwrap();
+
+        // start_date 设为明天，所有现有文件都应在入职前
+        let tomorrow = Local::now().date_naive() + Duration::days(1);
+        let ctx = make_scan_ctx(&temp_dir, tomorrow);
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_directory(&ctx, &dir, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 0, "入职日期后的文件应被过滤");
+    }
+
+    #[test]
+    fn test_scan_directory_empty_dir() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dir = temp_dir.path().join("empty");
+        std::fs::create_dir(&dir).unwrap();
+
+        let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_directory(&ctx, &dir, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 0);
+    }
+
+    #[test]
+    fn test_scan_wechat_finds_wxid_dirs() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let wechat_dir = temp_dir.path().join("Documents").join("WeChat Files");
+        std::fs::create_dir_all(&wechat_dir).unwrap();
+
+        let wxid_dir = wechat_dir.join("wxid_abc123");
+        std::fs::create_dir(&wxid_dir).unwrap();
+        std::fs::write(wxid_dir.join("msg.db"), "dummy").unwrap();
+
+        let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_wechat(&ctx, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].category, TraceCategory::Chat);
+        assert_eq!(items[0].id, "wechat-wxid_abc123");
+        assert!(items[0].name.contains("wxid_abc123"));
+        assert_eq!(items[0].suggested_action, Some(Action::DeleteOrPack));
+        assert_eq!(items[0].path, Some(wxid_dir));
+    }
+
+    #[test]
+    fn test_scan_wechat_ignores_non_wxid() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let wechat_dir = temp_dir.path().join("Documents").join("WeChat Files");
+        std::fs::create_dir_all(&wechat_dir).unwrap();
+
+        let other_dir = wechat_dir.join("All Users");
+        std::fs::create_dir(&other_dir).unwrap();
+
+        let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_wechat(&ctx, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 0, "非 wxid_ 目录应被忽略");
+    }
+
+    #[test]
+    fn test_scan_wechat_no_dir_returns_empty() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        // 不创建 WeChat Files 目录
+
+        let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_wechat(&ctx, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 0);
     }
 }

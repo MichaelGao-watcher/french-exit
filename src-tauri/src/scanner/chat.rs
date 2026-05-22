@@ -249,6 +249,8 @@ impl Scanner for ChatScanner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     #[test]
     fn test_chat_scanner_trait_compiles() {
@@ -285,5 +287,118 @@ mod tests {
 
         let subdirs = ChatScanner::collect_subdirs(temp_dir.path());
         assert_eq!(subdirs.len(), 2);
+    }
+
+    // ── scan() 集成测试 ─────────────────────────────────────────
+
+    fn make_ctx(user_home: &std::path::Path) -> ScanContext {
+        ScanContext {
+            start_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+            user_home: user_home.to_path_buf(),
+            temp_dir: user_home.to_path_buf(),
+        }
+    }
+
+    #[test]
+    fn test_chat_scan_finds_all_apps() {
+        let temp = tempfile::tempdir().unwrap();
+        let user_home = temp.path();
+
+        // QQ
+        let qq_dir = user_home.join("Documents").join("Tencent Files").join("123456");
+        std::fs::create_dir_all(&qq_dir).unwrap();
+        std::fs::write(qq_dir.join("msg.db"), "qq data").unwrap();
+
+        // DingTalk
+        let dingtalk_dir = user_home.join("AppData").join("Roaming").join("DingTalk");
+        std::fs::create_dir_all(&dingtalk_dir).unwrap();
+
+        // Lark
+        let lark_dir = user_home.join("AppData").join("Roaming").join("Lark");
+        std::fs::create_dir_all(&lark_dir).unwrap();
+
+        // WXWork
+        let wxwork_dir = user_home.join("Documents").join("WXWork").join("corp123");
+        std::fs::create_dir_all(&wxwork_dir).unwrap();
+
+        let ctx = make_ctx(user_home);
+        let scanner = ChatScanner::new();
+        let (_tx, rx) = tokio::sync::watch::channel(false);
+
+        let progress_count = Arc::new(AtomicUsize::new(0));
+        let pc = progress_count.clone();
+        let progress = move |_p: ScanProgress| {
+            pc.fetch_add(1, Ordering::SeqCst);
+        };
+        let items = scanner.scan(&ctx, &rx, &progress).unwrap();
+
+        assert_eq!(items.len(), 4, "应发现 QQ、钉钉、飞书、企业微信");
+        let ids: std::collections::HashSet<_> = items.iter().map(|i| i.id.as_str()).collect();
+        assert!(ids.contains("qq-123456"));
+        assert!(ids.contains("dingtalk-data"));
+        assert!(ids.contains("lark-data"));
+        assert!(ids.contains("wxwork-corp123"));
+        assert_eq!(progress_count.load(Ordering::SeqCst), 4);
+    }
+
+    #[test]
+    fn test_chat_scan_empty_home() {
+        let temp = tempfile::tempdir().unwrap();
+        let ctx = make_ctx(temp.path());
+        let scanner = ChatScanner::new();
+        let (_tx, rx) = tokio::sync::watch::channel(false);
+        let items = scanner.scan(&ctx, &rx, &|_p| {}).unwrap();
+        assert_eq!(items.len(), 0);
+    }
+
+    #[test]
+    fn test_chat_scan_qq_multiple_accounts() {
+        let temp = tempfile::tempdir().unwrap();
+        let qq_base = temp.path().join("Documents").join("Tencent Files");
+        std::fs::create_dir_all(qq_base.join("111111")).unwrap();
+        std::fs::create_dir_all(qq_base.join("222222")).unwrap();
+
+        let ctx = make_ctx(temp.path());
+        let scanner = ChatScanner::new();
+        let (_tx, rx) = tokio::sync::watch::channel(false);
+        let items = scanner.scan(&ctx, &rx, &|_p| {}).unwrap();
+
+        assert_eq!(items.len(), 2);
+        let ids: Vec<_> = items.iter().map(|i| i.id.as_str()).collect();
+        assert!(ids.contains(&"qq-111111"));
+        assert!(ids.contains(&"qq-222222"));
+    }
+
+    #[test]
+    fn test_chat_scan_feishu_fallback() {
+        let temp = tempfile::tempdir().unwrap();
+        let feishu_dir = temp.path().join("AppData").join("Roaming").join("Feishu");
+        std::fs::create_dir_all(&feishu_dir).unwrap();
+
+        let ctx = make_ctx(temp.path());
+        let scanner = ChatScanner::new();
+        let (_tx, rx) = tokio::sync::watch::channel(false);
+        let items = scanner.scan(&ctx, &rx, &|_p| {}).unwrap();
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "lark-data");
+        assert!(items[0].name.contains("飞书"));
+    }
+
+    #[test]
+    fn test_chat_scan_lark_preferred_over_feishu() {
+        let temp = tempfile::tempdir().unwrap();
+        let lark_dir = temp.path().join("AppData").join("Roaming").join("Lark");
+        let feishu_dir = temp.path().join("AppData").join("Roaming").join("Feishu");
+        std::fs::create_dir_all(&lark_dir).unwrap();
+        std::fs::create_dir_all(&feishu_dir).unwrap();
+
+        let ctx = make_ctx(temp.path());
+        let scanner = ChatScanner::new();
+        let (_tx, rx) = tokio::sync::watch::channel(false);
+        let items = scanner.scan(&ctx, &rx, &|_p| {}).unwrap();
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].path, Some(lark_dir));
     }
 }

@@ -167,4 +167,140 @@ mod tests {
         let result = executor.execute(&item).unwrap();
         assert!(matches!(result.status, ExecutionStatus::Skipped(_)));
     }
+
+    // 以下测试覆盖实际文件/目录删除路径（FileSystem / Chat / Browser / System / DevTools）
+
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn temp_test_path(name: &str) -> std::path::PathBuf {
+        let mut dir = std::env::temp_dir();
+        dir.push(format!(
+            "french-exit-test-{}-{}-{}",
+            name,
+            std::process::id(),
+            TEST_COUNTER.fetch_add(1, Ordering::SeqCst)
+        ));
+        dir
+    }
+
+    #[test]
+    fn test_delete_executor_file_removed() {
+        let path = temp_test_path("file");
+        std::fs::write(&path, "test content").unwrap();
+        assert!(path.exists());
+
+        let eraser = Arc::new(DoDEraser::default());
+        let executor = DeleteExecutor::new(eraser);
+        let item = TraceItem {
+            id: "file-test".to_string(),
+            category: TraceCategory::FileSystem,
+            scanner_id: "test".to_string(),
+            name: "测试文件".to_string(),
+            path: Some(path.clone()),
+            size_bytes: Some(12),
+            modified_at: None,
+            inferred: false,
+            risk_note: None,
+            suggested_action: Some(Action::Delete),
+        };
+
+        let result = executor.execute(&item).unwrap();
+        assert!(matches!(result.status, ExecutionStatus::Success));
+        assert_eq!(result.item_id, "file-test");
+        assert_eq!(result.action, Action::Delete);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn test_delete_executor_directory_removed() {
+        let path = temp_test_path("dir");
+        std::fs::create_dir_all(&path).unwrap();
+        let child = path.join("child.txt");
+        std::fs::write(&child, "nested").unwrap();
+        assert!(path.exists());
+        assert!(child.exists());
+
+        let eraser = Arc::new(DoDEraser::default());
+        let executor = DeleteExecutor::new(eraser);
+        let item = TraceItem {
+            id: "dir-test".to_string(),
+            category: TraceCategory::FileSystem,
+            scanner_id: "test".to_string(),
+            name: "测试目录".to_string(),
+            path: Some(path.clone()),
+            size_bytes: None,
+            modified_at: None,
+            inferred: false,
+            risk_note: None,
+            suggested_action: Some(Action::Delete),
+        };
+
+        let result = executor.execute(&item).unwrap();
+        assert!(matches!(result.status, ExecutionStatus::Success));
+        assert!(!path.exists());
+        assert!(!child.exists());
+    }
+
+    #[test]
+    fn test_delete_executor_missing_path_skipped() {
+        let path = temp_test_path("missing");
+        assert!(!path.exists());
+
+        let eraser = Arc::new(DoDEraser::default());
+        let executor = DeleteExecutor::new(eraser);
+        let item = TraceItem {
+            id: "missing-test".to_string(),
+            category: TraceCategory::FileSystem,
+            scanner_id: "test".to_string(),
+            name: "不存在的文件".to_string(),
+            path: Some(path),
+            size_bytes: None,
+            modified_at: None,
+            inferred: false,
+            risk_note: None,
+            suggested_action: Some(Action::Delete),
+        };
+
+        let result = executor.execute(&item).unwrap();
+        assert!(matches!(result.status, ExecutionStatus::Skipped(_)));
+    }
+
+    #[test]
+    fn test_delete_executor_chat_browser_system_devtools_removed() {
+        let eraser = Arc::new(DoDEraser::default());
+        let executor = DeleteExecutor::new(eraser);
+
+        for category in [
+            TraceCategory::Chat,
+            TraceCategory::Browser,
+            TraceCategory::System,
+            TraceCategory::DevTools,
+        ] {
+            let path = temp_test_path(&format!("{:?}", category).to_lowercase());
+            std::fs::write(&path, "x").unwrap();
+
+            let item = TraceItem {
+                id: format!("{:?}-test", category),
+                category,
+                scanner_id: "test".to_string(),
+                name: format!("{:?}", category),
+                path: Some(path.clone()),
+                size_bytes: None,
+                modified_at: None,
+                inferred: false,
+                risk_note: None,
+                suggested_action: Some(Action::Delete),
+            };
+
+            let result = executor.execute(&item).unwrap();
+            assert!(
+                matches!(result.status, ExecutionStatus::Success),
+                "{:?} should delete file",
+                category
+            );
+            assert!(!path.exists(), "{:?} file should be removed", category);
+        }
+    }
 }

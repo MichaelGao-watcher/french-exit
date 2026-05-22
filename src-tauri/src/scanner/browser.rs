@@ -51,12 +51,9 @@ impl BrowserScanner {
         }
     }
 
-    /// 检测 Firefox 默认 Profile 目录
-    /// 通过解析 `%APPDATA%\Mozilla\Firefox\profiles.ini` 获取 Default=1 的 Profile，
-    /// 若无 Default 标记则取第一个存在的 Profile。
-    fn detect_firefox_profile() -> Option<PathBuf> {
-        let appdata = std::env::var("APPDATA").ok()?;
-        let firefox_dir = PathBuf::from(&appdata).join("Mozilla").join("Firefox");
+    /// 检测 Firefox 默认 Profile 目录（可测试版本，接受 appdata 路径）
+    fn detect_firefox_profile_from(appdata: &Path) -> Option<PathBuf> {
+        let firefox_dir = appdata.join("Mozilla").join("Firefox");
         let profiles_ini = firefox_dir.join("profiles.ini");
         if !profiles_ini.exists() {
             return None;
@@ -130,6 +127,14 @@ impl BrowserScanner {
         }
 
         None
+    }
+
+    /// 检测 Firefox 默认 Profile 目录
+    /// 通过解析 `%APPDATA%\Mozilla\Firefox\profiles.ini` 获取 Default=1 的 Profile，
+    /// 若无 Default 标记则取第一个存在的 Profile。
+    fn detect_firefox_profile() -> Option<PathBuf> {
+        let appdata = std::env::var("APPDATA").ok()?;
+        Self::detect_firefox_profile_from(Path::new(&appdata))
     }
 
     // ── 时间转换 ─────────────────────────────────────────────────
@@ -520,5 +525,197 @@ mod tests {
         let id2 = BrowserScanner::generate_url_id("chrome", "https://example.com");
         assert_eq!(id1, id2);
         assert!(id1.starts_with("browser-chrome-"));
+    }
+
+    // ── detect_firefox_profile_from 测试 ─────────────────────────
+
+    #[test]
+    fn test_detect_firefox_profile_default_relative() {
+        let temp = tempfile::tempdir().unwrap();
+        let firefox_dir = temp.path().join("Mozilla").join("Firefox");
+        std::fs::create_dir_all(&firefox_dir).unwrap();
+
+        let profile_dir = firefox_dir.join("profiles").join("abc123");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        let ini_content = "[Profile0]\nName=default\nIsRelative=1\nPath=profiles/abc123\nDefault=1\n";
+        std::fs::write(firefox_dir.join("profiles.ini"), ini_content).unwrap();
+
+        let result = BrowserScanner::detect_firefox_profile_from(temp.path());
+        assert_eq!(result, Some(profile_dir));
+    }
+
+    #[test]
+    fn test_detect_firefox_profile_fallback_first_existing() {
+        let temp = tempfile::tempdir().unwrap();
+        let firefox_dir = temp.path().join("Mozilla").join("Firefox");
+        std::fs::create_dir_all(&firefox_dir).unwrap();
+
+        let profile2 = firefox_dir.join("profiles").join("second");
+        std::fs::create_dir_all(&profile2).unwrap();
+
+        let ini_content = "[Profile0]\nName=missing\nIsRelative=1\nPath=profiles/missing\n\n[Profile1]\nName=second\nIsRelative=1\nPath=profiles/second\n";
+        std::fs::write(firefox_dir.join("profiles.ini"), ini_content).unwrap();
+
+        let result = BrowserScanner::detect_firefox_profile_from(temp.path());
+        assert_eq!(result, Some(profile2));
+    }
+
+    #[test]
+    fn test_detect_firefox_profile_absolute_path() {
+        let temp = tempfile::tempdir().unwrap();
+        let firefox_dir = temp.path().join("Mozilla").join("Firefox");
+        std::fs::create_dir_all(&firefox_dir).unwrap();
+
+        let abs_profile = temp.path().join("custom-profile");
+        std::fs::create_dir_all(&abs_profile).unwrap();
+
+        let ini_content = format!(
+            "[Profile0]\nName=custom\nIsRelative=0\nPath={}\nDefault=1\n",
+            abs_profile.display()
+        );
+        std::fs::write(firefox_dir.join("profiles.ini"), ini_content).unwrap();
+
+        let result = BrowserScanner::detect_firefox_profile_from(temp.path());
+        assert_eq!(result, Some(abs_profile));
+    }
+
+    #[test]
+    fn test_detect_firefox_profile_no_ini_returns_none() {
+        let temp = tempfile::tempdir().unwrap();
+        let result = BrowserScanner::detect_firefox_profile_from(temp.path());
+        assert_eq!(result, None);
+    }
+
+    // ── SQLite 历史记录扫描测试 ─────────────────────────────────
+
+    #[test]
+    fn test_scan_chromium_history_filters_by_date() {
+        let temp = tempfile::tempdir().unwrap();
+        let db_path = temp.path().join("History");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "CREATE TABLE urls (url TEXT, title TEXT, last_visit_time INTEGER)",
+            [],
+        ).unwrap();
+
+        let date_2024 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        let chrome_time_2024 = BrowserScanner::naive_date_to_chrome_time(date_2024);
+        conn.execute(
+            "INSERT INTO urls (url, title, last_visit_time) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["https://example.com", "Example", chrome_time_2024],
+        ).unwrap();
+
+        let date_2023 = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+        let chrome_time_2023 = BrowserScanner::naive_date_to_chrome_time(date_2023);
+        conn.execute(
+            "INSERT INTO urls (url, title, last_visit_time) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["https://old.com", "Old", chrome_time_2023],
+        ).unwrap();
+
+        let start_date = NaiveDate::from_ymd_opt(2023, 6, 1).unwrap();
+        let progress = |_p: ScanProgress| {};
+        let items = BrowserScanner::scan_chromium_history(&db_path, start_date, "chrome", &progress).unwrap();
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "Example");
+        assert_eq!(items[0].category, TraceCategory::Browser);
+        assert!(items[0].id.starts_with("browser-chrome-"));
+        assert!(items[0].path.as_ref().unwrap().ends_with("History"));
+    }
+
+    #[test]
+    fn test_scan_firefox_history_filters_by_date() {
+        let temp = tempfile::tempdir().unwrap();
+        let db_path = temp.path().join("places.sqlite");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "CREATE TABLE moz_places (url TEXT, title TEXT, last_visit_date INTEGER)",
+            [],
+        ).unwrap();
+
+        let date_2024 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        let ff_time_2024 = BrowserScanner::naive_date_to_firefox_time(date_2024);
+        conn.execute(
+            "INSERT INTO moz_places (url, title, last_visit_date) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["https://example.com", "Example", ff_time_2024],
+        ).unwrap();
+
+        let date_2023 = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+        let ff_time_2023 = BrowserScanner::naive_date_to_firefox_time(date_2023);
+        conn.execute(
+            "INSERT INTO moz_places (url, title, last_visit_date) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["https://old.com", "Old", ff_time_2023],
+        ).unwrap();
+
+        let start_date = NaiveDate::from_ymd_opt(2023, 6, 1).unwrap();
+        let progress = |_p: ScanProgress| {};
+        let items = BrowserScanner::scan_firefox_history(&db_path, start_date, &progress).unwrap();
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "Example");
+        assert_eq!(items[0].category, TraceCategory::Browser);
+        assert!(items[0].id.starts_with("browser-firefox-"));
+    }
+
+    #[test]
+    fn test_scan_chromium_history_empty_db() {
+        let temp = tempfile::tempdir().unwrap();
+        let db_path = temp.path().join("History");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "CREATE TABLE urls (url TEXT, title TEXT, last_visit_time INTEGER)",
+            [],
+        ).unwrap();
+
+        let start_date = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        let progress = |_p: ScanProgress| {};
+        let items = BrowserScanner::scan_chromium_history(&db_path, start_date, "edge", &progress).unwrap();
+
+        assert_eq!(items.len(), 0);
+    }
+
+    #[test]
+    fn test_scan_chromium_history_title_truncation() {
+        let temp = tempfile::tempdir().unwrap();
+        let db_path = temp.path().join("History");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "CREATE TABLE urls (url TEXT, title TEXT, last_visit_time INTEGER)",
+            [],
+        ).unwrap();
+
+        let long_title = "a".repeat(200);
+        let date = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        let chrome_time = BrowserScanner::naive_date_to_chrome_time(date);
+        conn.execute(
+            "INSERT INTO urls (url, title, last_visit_time) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["https://x.com", &long_title, chrome_time],
+        ).unwrap();
+
+        // start_date 必须早于数据日期，因为查询条件是 last_visit_time > start_date（严格大于）
+        let start_date = NaiveDate::from_ymd_opt(2023, 12, 31).unwrap();
+        let progress = |_p: ScanProgress| {};
+        let items = BrowserScanner::scan_chromium_history(&db_path, start_date, "chrome", &progress).unwrap();
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name.chars().count(), 100);
+    }
+
+    // ── 辅助函数测试 ────────────────────────────────────────────
+
+    #[test]
+    fn test_make_locked_item() {
+        let path = Path::new("C:\\History");
+        let item = BrowserScanner::make_locked_item("Chrome", path);
+        assert_eq!(item.id, "browser-chrome-locked");
+        assert!(item.name.contains("Chrome"));
+        assert!(item.risk_note.as_ref().unwrap().contains("正在运行"));
+        assert_eq!(item.category, TraceCategory::Browser);
+        assert_eq!(item.suggested_action, Some(Action::Delete));
     }
 }
