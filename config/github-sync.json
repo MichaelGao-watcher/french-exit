@@ -1,0 +1,30 @@
+{
+  "_comment": "由 pull.py 自动创建。修改后运行 python scripts/pull.py 同步更新。",
+  "username": "MichaelGao1999",
+  "token": "",
+  "includeRepos": [],
+  "excludeRepos": [],
+  "syncFrom": "vibe-coding-project-sop",
+  "_syncFromComment": "只从指定母库拉取经验。如需改为聚合模式（遍历所有仓库），请清空此字段。",
+  "targetFiles": [
+    "decisions.md",
+    "lessons-learned.md",
+    "troubleshooting.md"
+  ],
+  "branch": "master",
+  "backupBeforeMerge": true,
+  "mergeStrategy": {
+    "lessonsLearned": {
+      "dedupBy": "description",
+      "action": "mergeSources"
+    },
+    "troubleshooting": {
+      "dedupBy": "keyword",
+      "action": "keepLongestSolution"
+    },
+    "decisions": {
+      "dedupBy": "none",
+      "action": "appendAll"
+    }
+  }
+}

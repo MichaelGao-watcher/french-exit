@@ -45,3 +45,6 @@ Thumbs.db
 # Playwright
 test-results/
 playwright-report/
+
+# Vibe Coding SOP backups
+.backup/
