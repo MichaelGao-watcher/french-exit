@@ -402,3 +402,41 @@
 - 前端 vitest 51 测全绿、E2E 16 测全绿、后端 Rust 129 测全绿
 - release/ 目录已更新为最新构建（含假删除模式 + Logo 点击修复 + 扫描暂停修复）
 - 用户可继续试用功能，如有新 Bug 直接给出具体现象
+
+---
+
+### 2026-05-22 16:10-16:35
+
+**目标**：修复扫描进度条"一秒到 100%"的 UI 问题
+
+**实际完成**：
+- ✅ Bug 修复：扫描进度条不准确（扫描十分钟，进度条一秒跑完）
+  - 根因：7 个 Scanner 并行报告局部进度，轻量 Scanner（chat/devtools/registry/env）瞬间到 100%
+  - 前端直接计算 `current/total * 100` 当全局进度 + `displayPercentRef` "只增不减"锁死 100%
+  - 重量级 `scanner-fs` 的实际进度被完全忽略
+- ✅ 后端：ScannerRegistry 计算全局加权进度
+  - `ScanProgress` 新增 `global_percent: Option<u8>` 字段
+  - `scan_impl` 为每个 Scanner 分配权重（fs 50% + browser 15% + system 15% + 其他各 5%）
+  - 实时计算加权平均并随进度事件推送
+- ✅ 全链路适配
+  - `ProgressEvent::ScanProgress` 添加 `global_percent` 字段
+  - Orchestrator 透传 `global_percent`
+  - 7 个 scanner 实现全部适配新字段
+  - 前端 `types.ts` / `ScanPage.tsx` 优先使用全局进度
+  - E2E mock 适配
+- ✅ 测试验证：`cargo test --lib` 129 测全绿，`npm run test:run` 51 测全绿
+- ✅ 文档更新：`status.md` / `decisions.md` (ADR-017) / `lessons-learned.md`
+
+**关键决策**：
+- **全局进度计算放在后端而非前端**：后端知道所有 Scanner 列表和权重，前端只需被动接收；若放前端需维护 Scanner→权重映射，增加耦合
+- **权重分配基于预估耗时而非均分**：fs scanner（全盘递归）权重 50%，browser/system 各 15%，其余轻量各 5%。总和 100%，保证全局百分比有意义
+- **保留回退路径**：前端 `event.global_percent != null` 判断，无全局进度时回退到旧局部计算逻辑，兼容测试/mock 环境
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：`StrReplaceFile` 对 `scanner/mod.rs` 的修改未生效（工具报告成功但实际文件未变）→ 根因：可能是缓存或并发状态问题 → 解决：二次调用 `StrReplaceFile` 确认写入
+- **阻碍**：批量 perl 替换把 `global_percent: None,` 插入到错误位置（`});` 之后而非之前），导致 20 处编译错误 → 解决：用 perl 反向修复，将 `}); global_percent: None,\n});` 替换为正确的字段位置
+- **阻碍**：`ScannerRegistry::scan_impl` 的 `StrReplaceFile` 首次匹配失败（old 字符串与实际文件内容不一致）→ 解决：重新读取文件获取确切内容后再次替换
+
+**遗留问题 / 下轮开始点**：
+- release/ 目录中的 exe 尚未重新构建（前端无变更但后端有变更，建议重新打包）
+- 用户如需继续调整 UI/UX，直接给出具体修改指令
