@@ -108,6 +108,8 @@ pub enum ProgressEvent {
         current: usize,
         total: usize,
         message: String,
+        /// 全局加权进度百分比（0-100），由 ScannerRegistry 计算
+        global_percent: Option<u8>,
     },
     ScanCompleted { item_count: usize },
     ScanFailed { reason: String },

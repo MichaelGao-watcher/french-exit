@@ -290,6 +290,7 @@ impl BrowserScanner {
                         "已扫描 {} 条 {} 历史记录",
                         processed, browser_prefix
                     ),
+                    global_percent: None,
                 });
             }
         }
@@ -390,6 +391,7 @@ impl BrowserScanner {
                         "已扫描 {} 条 Firefox 历史记录",
                         processed
                     ),
+                    global_percent: None,
                 });
             }
         }

@@ -2,6 +2,7 @@ use crate::error::BackendError;
 use crate::scanner::ScanProgress;
 use crate::scanner::Scanner;
 use crate::types::{ScanContext, TraceCategory, TraceItem};
+use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::watch;
 use tokio::task::JoinSet;
@@ -116,6 +117,26 @@ impl ScannerRegistry {
         // 内部进度通道：各扫描任务通过此通道发送进度，主任务实时转发给回调
         let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel::<ScanProgress>(128);
 
+        // 为每个 Scanner 分配权重（反映预估耗时占比，总和 = 100）
+        let mut scanner_weights: HashMap<String, u8> = HashMap::new();
+        for &idx in indices {
+            let scanner = &self.scanners[idx];
+            let weight = match scanner.id() {
+                "scanner-fs" => 50,
+                "scanner-browser" => 15,
+                "scanner-system" => 15,
+                "scanner-chat" => 5,
+                "scanner-registry-sys" => 5,
+                "scanner-devtools" => 5,
+                "scanner-env" => 5,
+                _ => 5,
+            };
+            scanner_weights.insert(scanner.id().to_string(), weight);
+        }
+
+        // 跟踪每个 Scanner 的最新进度，用于计算全局加权百分比
+        let mut scanner_progress: HashMap<String, (usize, usize)> = HashMap::new();
+
         let mut join_set = JoinSet::new();
 
         for &idx in indices {
@@ -136,6 +157,10 @@ impl ScannerRegistry {
                 }
 
                 let progress_cb = |p: ScanProgress| {
+                    // 扫描过程中定期检查暂停信号：若暂停则阻塞等待
+                    while *pause_rx.borrow() {
+                        std::thread::sleep(Duration::from_millis(100));
+                    }
                     let _ = p_tx.blocking_send(p);
                 };
 
@@ -150,10 +175,32 @@ impl ScannerRegistry {
         let mut all_items = Vec::new();
         let mut error_msgs = Vec::new();
 
-        // 并发等待任务完成 + 实时转发进度
+        // 并发等待任务完成 + 实时转发进度（附带全局加权百分比）
         loop {
             tokio::select! {
-                Some(p) = progress_rx.recv() => {
+                Some(mut p) = progress_rx.recv() => {
+                    // 更新该 Scanner 的最新进度
+                    scanner_progress.insert(p.scanner_id.clone(), (p.current, p.total));
+
+                    // 计算全局加权百分比
+                    let global_percent = if !scanner_weights.is_empty() {
+                        let sum: f64 = scanner_progress.iter()
+                            .filter_map(|(id, (current, total))| {
+                                scanner_weights.get(id).map(|&w| {
+                                    let ratio = if *total > 0 {
+                                        *current as f64 / *total as f64
+                                    } else {
+                                        0.0
+                                    };
+                                    ratio * w as f64
+                                })
+                            })
+                            .sum();
+                        Some((sum as u8).min(100))
+                    } else {
+                        None
+                    };
+                    p.global_percent = global_percent;
                     progress(p);
                 }
                 res = join_set.join_next() => {
@@ -170,7 +217,26 @@ impl ScannerRegistry {
                         }
                         None => {
                             // 所有扫描任务已完成，Drain 剩余进度
-                            while let Ok(p) = progress_rx.try_recv() {
+                            while let Ok(mut p) = progress_rx.try_recv() {
+                                scanner_progress.insert(p.scanner_id.clone(), (p.current, p.total));
+                                let global_percent = if !scanner_weights.is_empty() {
+                                    let sum: f64 = scanner_progress.iter()
+                                        .filter_map(|(id, (current, total))| {
+                                            scanner_weights.get(id).map(|&w| {
+                                                let ratio = if *total > 0 {
+                                                    *current as f64 / *total as f64
+                                                } else {
+                                                    0.0
+                                                };
+                                                ratio * w as f64
+                                            })
+                                        })
+                                        .sum();
+                                    Some((sum as u8).min(100))
+                                } else {
+                                    None
+                                };
+                                p.global_percent = global_percent;
                                 progress(p);
                             }
                             break;
@@ -280,6 +346,7 @@ mod tests {
                     current: i + 1,
                     total: self.progress_count,
                     message: format!("进度 {}/{}", i + 1, self.progress_count),
+                    global_percent: None,
                 });
             }
 

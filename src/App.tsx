@@ -95,10 +95,10 @@ function AppContent() {
       <div
         className={`
           fixed z-50 font-semibold tracking-tight text-foreground select-none
-          transition-all duration-500 ease-out
+          transition-all duration-500 ease-out pointer-events-none
           ${state.page === "welcome"
             ? "top-[32%] left-1/2 -translate-x-1/2 text-5xl opacity-100"
-            : "top-0 left-1/2 -translate-x-1/2 text-3xl opacity-0 pointer-events-none"
+            : "top-0 left-1/2 -translate-x-1/2 text-3xl opacity-0"
           }
         `}
       >

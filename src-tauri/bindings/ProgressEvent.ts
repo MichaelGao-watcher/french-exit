@@ -4,4 +4,8 @@ import type { ExecutionReport } from "./ExecutionReport";
 /**
  * 进度事件（推送到前端）
  */
-export type ProgressEvent = { "type": "ScanStarted", total_scanners: number, } | { "type": "ScanProgress", scanner_id: string, current: number, total: number, message: string, } | { "type": "ScanCompleted", item_count: number, } | { "type": "ScanFailed", reason: string, } | { "type": "ScanPaused" } | { "type": "ScanResumed" } | { "type": "ExecutionStarted", total_items: number, } | { "type": "ExecutionProgress", current: number, total: number, message: string, } | { "type": "ExecutionCompleted", report: ExecutionReport, };
+export type ProgressEvent = { "type": "ScanStarted", total_scanners: number, } | { "type": "ScanProgress", scanner_id: string, current: number, total: number, message: string, 
+/**
+ * 全局加权进度百分比（0-100），由 ScannerRegistry 计算
+ */
+global_percent: number | null, } | { "type": "ScanCompleted", item_count: number, } | { "type": "ScanFailed", reason: string, } | { "type": "ScanPaused" } | { "type": "ScanResumed" } | { "type": "ExecutionStarted", total_items: number, } | { "type": "ExecutionProgress", current: number, total: number, message: string, } | { "type": "ExecutionCompleted", report: ExecutionReport, };

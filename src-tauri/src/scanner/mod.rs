@@ -31,6 +31,9 @@ pub struct ScanProgress {
     pub current: usize,
     pub total: usize,
     pub message: String,
+    /// 全局加权进度百分比（0-100），由 ScannerRegistry 计算。
+    /// 若存在则前端应优先使用此值，而非自行计算局部进度。
+    pub global_percent: Option<u8>,
 }
 
 /// 所有扫描器必须实现的 trait

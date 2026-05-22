@@ -48,16 +48,22 @@ export function ScanPage() {
           });
           break;
         case "ScanProgress":
-          dispatch({
-            type: "SET_PROGRESS",
-            payload: {
-              message: event.message || "正在扫描…",
-              percent:
-                event.total > 0
+          {
+            // 优先使用后端计算的全局加权进度，避免局部进度被误当全局进度
+            const percent =
+              event.global_percent != null
+                ? event.global_percent
+                : event.total > 0
                   ? Math.round((event.current / event.total) * 100)
-                  : displayPercentRef.current,
-            },
-          });
+                  : displayPercentRef.current;
+            dispatch({
+              type: "SET_PROGRESS",
+              payload: {
+                message: event.message || "正在扫描…",
+                percent,
+              },
+            });
+          }
           break;
         case "ScanCompleted":
           dispatch({ type: "SET_SCANNING", payload: false });

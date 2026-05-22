@@ -127,6 +127,24 @@
 
 ---
 
+### sed 批量修改误改结构体定义 [来源:french-exit @2026-05-22]
+
+| | 内容 |
+|---|---|
+| **现象** | `cargo tauri build` 报错 `missing field global_percent in initializer of ScanProgress`，但 `scanner/mod.rs` 中并未主动添加该字段 |
+| **原因** | 使用 `sed -i '/ScanProgress {/...'` 批量给所有 `ScanProgress` 实例添加字段时，也匹配到了 `pub struct ScanProgress {` 结构体定义行，在定义中插入了 `global_percent: None,` |
+| **解决** | 1. `git checkout mod.rs` 还原结构体定义<br>2. 改用更精确的匹配条件，或手动逐个文件修改 |
+| **注意** | 批量文本替换时，结构体定义和实例化共用同一关键字，需额外排除定义行 |
+
+### French Exit 进程锁定 exe 导致复制失败 [来源:french-exit @2026-05-22]
+
+| | 内容 |
+|---|---|
+| **现象** | `cp` 报错 `cannot create regular file: Device or resource busy` |
+| **原因** | French Exit 正在运行，Windows 锁定 exe 文件句柄 |
+| **解决** | 1. `taskkill //F //IM french-exit.exe` 强制终止进程<br>2. `rm -f release/french-exit.exe` 强制删除旧文件<br>3. 重新复制新构建的 exe |
+| **注意** | Tauri 构建时的 bundle patching 步骤也会因文件锁定而报 `os error 32`，不影响 exe 本身 |
+
 *新增条目时复制上方模板，按"错误关键词"作为标题，便于快速搜索。*
 
 ---

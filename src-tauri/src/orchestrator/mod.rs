@@ -51,11 +51,11 @@ pub enum SessionState {
 pub struct Orchestrator {
     scanner_registry: Arc<ScannerRegistry>,
     temp_store: Arc<TempStore>,
+    #[allow(dead_code)]
     resource_controller: Arc<ResourceController>,
     delete_executor: Arc<DeleteExecutor>,
     pack_executor: Arc<PackExecutor>,
     preserve_executor: Arc<PreserveExecutor>,
-    reporter: Reporter,
     state: Arc<std::sync::Mutex<SessionState>>,
     pause_tx: Arc<std::sync::Mutex<Option<tokio::sync::watch::Sender<bool>>>>,
     /// 当前扫描会话 ID，用于 Pause → Scanning 恢复时重建状态
@@ -85,7 +85,6 @@ impl Orchestrator {
             delete_executor: Arc::new(delete_executor),
             pack_executor: Arc::new(pack_executor),
             preserve_executor: Arc::new(preserve_executor),
-            reporter: Reporter,
             state: Arc::new(std::sync::Mutex::new(SessionState::Idle)),
             pause_tx: Arc::new(std::sync::Mutex::new(None)),
             current_scan_id: Arc::new(std::sync::Mutex::new(None)),
@@ -203,6 +202,7 @@ impl Orchestrator {
                                 current: p.current,
                                 total: p.total,
                                 message: p.message,
+                                global_percent: p.global_percent,
                             });
                         }
                     }

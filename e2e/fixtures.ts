@@ -174,4 +174,23 @@ export const test = base.extend<{
   },
 });
 
+/**
+ * 通过自定义 DatePicker 设置日期（年/月/日三级下拉面板）
+ */
+export async function fillDatePicker(page: Page, dateStr: string) {
+  const [year, month, day] = dateStr.split("-");
+
+  // 年份
+  await page.getByRole("button", { name: "年", exact: true }).click();
+  await page.getByRole("button", { name: `${year}年`, exact: true }).click();
+
+  // 月份
+  await page.getByRole("button", { name: "月", exact: true }).click();
+  await page.getByRole("button", { name: `${month}月`, exact: true }).click();
+
+  // 日期
+  await page.getByRole("button", { name: "日", exact: true }).click();
+  await page.getByRole("button", { name: `${day}日`, exact: true }).click();
+}
+
 export { expect };

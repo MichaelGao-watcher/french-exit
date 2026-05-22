@@ -10,7 +10,11 @@ use crate::types::{Action, ExecutionResult, ExecutionStatus, TraceCategory, Trac
 /// 对标记为 `Action::Delete` 的 `TraceItem` 调用安全擦除。
 /// 文件和目录由 `SecureEraser` 处理；注册表和环境变量暂时跳过，留待后续迭代。
 pub struct DeleteExecutor {
+    /// DoD 安全擦除器（当前策略已降级为普通删除，保留字段以便未来恢复）
+    #[allow(dead_code)]
     secure_eraser: Arc<dyn SecureEraser>,
+    /// 测试模式：不实际删除文件，仅记录日志
+    dry_run: bool,
 }
 
 impl DeleteExecutor {
@@ -19,7 +23,15 @@ impl DeleteExecutor {
     /// # 参数
     /// - `eraser`: 安全擦除器实例，使用 `Arc` 包装以便多线程共享
     pub fn new(eraser: Arc<dyn SecureEraser>) -> Self {
-        Self { secure_eraser: eraser }
+        Self {
+            secure_eraser: eraser,
+            dry_run: std::env::var("FRENCH_EXIT_DRY_RUN").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false),
+        }
+    }
+
+    /// 创建指定模式的删除执行器（用于测试显式控制）
+    pub fn with_mode(eraser: Arc<dyn SecureEraser>, dry_run: bool) -> Self {
+        Self { secure_eraser: eraser, dry_run }
     }
 }
 
@@ -34,6 +46,16 @@ impl Executor for DeleteExecutor {
             | TraceCategory::DevTools => {
                 if let Some(ref path) = item.path {
                     if path.exists() {
+                        if self.dry_run {
+                            // 测试模式：仅记录，不实际删除
+                            log::info!("[DRY RUN] 将删除: {}", path.display());
+                            return Ok(ExecutionResult {
+                                item_id: item.id.clone(),
+                                action: Action::Delete,
+                                status: ExecutionStatus::Success,
+                                detail: Some(format!("[测试模式] 模拟删除: {}", path.display())),
+                            });
+                        }
                         // 普通删除（非安全擦除），可通过数据恢复软件恢复
                         if path.is_file() {
                             std::fs::remove_file(path)

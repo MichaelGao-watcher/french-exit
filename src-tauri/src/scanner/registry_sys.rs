@@ -54,6 +54,7 @@ impl Scanner for RegistryScanner {
                 current: idx + 1,
                 total,
                 message: format!("正在扫描注册表: {}", subpath),
+                global_percent: None,
             });
 
             // 单个键读取失败时跳过，不中断整体扫描

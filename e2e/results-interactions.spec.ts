@@ -1,4 +1,4 @@
-import { test, expect, setupStandardMock, createMockTraceItems } from "./fixtures";
+import { test, expect, setupStandardMock, createMockTraceItems, fillDatePicker } from "./fixtures";
 
 /**
  * ResultsPage 交互细节 E2E
@@ -14,7 +14,7 @@ test.describe("ResultsPage 交互", () => {
     // 从欢迎页进入输入页
     await page.click('button:has-text("开始使用")');
 
-    await page.fill('#start-date', '2026-01-01');
+    await fillDatePicker(page, '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
 
@@ -54,7 +54,7 @@ test.describe("ResultsPage 交互", () => {
     // 从欢迎页进入输入页
     await page.click('button:has-text("开始使用")');
 
-    await page.fill('#start-date', '2026-01-01');
+    await fillDatePicker(page, '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
 
@@ -84,7 +84,7 @@ test.describe("ResultsPage 交互", () => {
     // 从欢迎页进入输入页
     await page.click('button:has-text("开始使用")');
 
-    await page.fill('#start-date', '2026-01-01');
+    await fillDatePicker(page, '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
 
@@ -128,7 +128,10 @@ test.describe("ResultsPage 交互", () => {
     await page.goto("/");
     await setupStandardMock(page, manyItems);
 
-    await page.fill('#start-date', '2026-01-01');
+    // 从欢迎页进入输入页
+    await page.click('button:has-text("开始使用")');
+
+    await fillDatePicker(page, '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
 

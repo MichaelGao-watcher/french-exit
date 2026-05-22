@@ -84,6 +84,7 @@ impl Scanner for EnvVarScanner {
                 current: idx + 1,
                 total,
                 message: format!("正在检查环境变量: {}", key),
+                global_percent: None,
             });
 
             let key_lower = key.to_lowercase();

@@ -55,6 +55,7 @@ impl Scanner for DevToolsScanner {
             current: 1,
             total,
             message: "Git 配置检测完成".to_string(),
+            global_percent: None,
         });
 
         // b) SSH 密钥
@@ -70,6 +71,7 @@ impl Scanner for DevToolsScanner {
             current: 2,
             total,
             message: "SSH 密钥检测完成".to_string(),
+            global_percent: None,
         });
 
         // c) VS Code 配置
@@ -93,6 +95,7 @@ impl Scanner for DevToolsScanner {
             current: 3,
             total,
             message: "VS Code 配置检测完成".to_string(),
+            global_percent: None,
         });
 
         // d) GitHub CLI 配置
@@ -127,6 +130,7 @@ impl Scanner for DevToolsScanner {
             current: 4,
             total,
             message: "GitHub CLI 配置检测完成".to_string(),
+            global_percent: None,
         });
 
         Ok(items)

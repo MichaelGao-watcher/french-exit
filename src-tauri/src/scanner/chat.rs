@@ -154,6 +154,7 @@ impl Scanner for ChatScanner {
             current: current_step,
             total: total_steps,
             message: "QQ 检测完成".to_string(),
+            global_percent: None,
         });
 
         // 2. 扫描钉钉
@@ -180,6 +181,7 @@ impl Scanner for ChatScanner {
             current: current_step,
             total: total_steps,
             message: "钉钉检测完成".to_string(),
+            global_percent: None,
         });
 
         // 3. 扫描飞书
@@ -206,6 +208,7 @@ impl Scanner for ChatScanner {
             current: current_step,
             total: total_steps,
             message: "飞书检测完成".to_string(),
+            global_percent: None,
         });
 
         // 4. 扫描企业微信
@@ -240,6 +243,7 @@ impl Scanner for ChatScanner {
             current: current_step,
             total: total_steps,
             message: "企业微信检测完成".to_string(),
+            global_percent: None,
         });
 
         Ok(items)

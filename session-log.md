@@ -355,3 +355,50 @@
 - Vite 预览服务器已停止，如需继续浏览器预览需重启
 - 前端 UI/UX 仍有调整空间（用户表示"要调的还有很多"），可直接给出具体修改指令
 - release/ 目录中的 exe 尚未重新构建（前端变更后建议重新打包）
+
+
+---
+
+### 2026-05-22 15:31-16:30
+
+**目标**：后端调试（编译警告修复、E2E 修复、假删除模式、功能试用问题排查）
+
+**实际完成**：
+- ✅ 修复 Rust 后端编译警告 6 项（0 警告）
+  - `commands/mod.rs`：移除 7 个未使用 import
+  - `lib.rs`：`Arc` import 加 `#[cfg(not(test))]`
+  - `executor/delete.rs`：`secure_eraser` 加 `#[allow(dead_code)]`
+  - `orchestrator/mod.rs`：移除 `reporter` 无用字段，`resource_controller` 加 `#[allow(dead_code)]`
+- ✅ E2E 测试 16 测从全挂修复到全绿
+  - 新增 `fillDatePicker()` 辅助函数适配自定义 DatePicker
+  - 深色模式测试适配（默认 dark，移除 `emulateMedia` 切换）
+  - 移除默认勾选适配（所有进入下一步的测试手动勾选 checkbox）
+  - ReportPage 重构适配（移除"开始新的清理"按钮，改为点击 Logo）
+  - ExecutingPage 事件驱动跳转适配（补充 `ExecutionCompleted` 事件 emit）
+  - 修复缺失的"开始使用"点击步骤
+  - 修复 `h1` 不存在断言（WelcomePage 无 `h1`）
+- ✅ 添加假删除模式
+  - `DeleteExecutor` 读取 `FRENCH_EXIT_DRY_RUN` 环境变量
+  - `dry_run = true` 时不调用 `remove_file`/`remove_dir_all`，仅记录日志
+  - 创建 `release/test-run.bat` 方便用户启动测试模式
+- ✅ 修复"点击无效后到不了下一层"
+  - 根因：`App.tsx` 大 Logo `fixed z-50` 未加 `pointer-events-none`，遮挡按钮点击
+  - 修复：统一添加 `pointer-events-none`
+- ✅ 修复"扫描时按暂停键无效"
+  - 根因：Scanner 在扫描过程中不检查 `pause_rx`，仅在扫描开始前检查
+  - 修复：`scan_impl` 的 `progress_cb` 中插入暂停检查循环
+- ✅ release 重新构建并复制到 `release/` 目录
+
+**关键决策**：
+- **假删除模式**：通过环境变量 `FRENCH_EXIT_DRY_RUN` 控制，而非前端开关。理由：测试模式与正常模式物理隔离，降低误操作风险
+- **扫描暂停实现位置**：在 `ScannerRegistry::scan_impl` 的 `progress_cb` 中检查 `pause_rx`，而非修改 7 个具体 scanner。理由：零侵入已有实现，调度层处理横切关注点
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：`cargo tauri build` 报错 `missing field global_percent` → 根因：sed 批量修改误把 `scanner/mod.rs` 结构体定义也改了 → 解决：`git checkout mod.rs` 还原，改用更精确的文件列表
+- **阻碍**：French Exit 进程锁定 exe 导致 `cp` 失败 → 根因：Windows 文件句柄锁定 → 解决：`taskkill //F //IM french-exit.exe` + `rm -f` 强制删除后复制
+- **阻碍**：`cargo test --lib` 首次超时（180s）→ 根因：文件锁竞争（之前的 `cargo check` 仍在运行）→ 解决：等待文件锁释放后重试
+
+**遗留问题 / 下轮开始点**：
+- 前端 vitest 51 测全绿、E2E 16 测全绿、后端 Rust 129 测全绿
+- release/ 目录已更新为最新构建（含假删除模式 + Logo 点击修复 + 扫描暂停修复）
+- 用户可继续试用功能，如有新 Bug 直接给出具体现象

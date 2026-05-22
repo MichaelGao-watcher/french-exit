@@ -12,7 +12,7 @@
 
 ## 当前阶段
 
-P2 ✅ | P3 vitest ✅ | P3 Playwright E2E ✅ | P1 UCRT ✅ | P4 后端 Rust 测试 ✅ | **UI/UX 迭代 + 分发就绪 ✅**
+P2 ✅ | P3 vitest ✅ | P3 Playwright E2E ✅ | P1 UCRT ✅ | P4 后端 Rust 测试 ✅ | UI/UX 迭代 + 分发就绪 ✅ | **后端调试 + 功能试用 ✅**
 
 ---
 
@@ -146,6 +146,7 @@ e2e/
 | 2026-05-20 | 新增：ResultsPage "全选全部"按钮（后端 get_all_scan_summaries 轻量接口）；路径文本可点击打开所在文件夹；Vite 开发服务器作为前端预览方案；release 重新构建并分发 |
 | 2026-05-21 | 前端全面调整（8 项）：Bug/性能/DRY/UX/布局/文案/预览模式/骨架修复；GitHub 用户名批量更新（5 仓库 + 全局 Git 配置）；vitest 49 测全绿 |
 | 2026-05-21 | 审计清理 + 策略调整 + Bug 修复：C 盘清理（2.8GB + Temp 残留）；删除策略降级（DoD → 普通删除）；扫描范围扩展（Desktop/Downloads → 全盘 C:Z:）；移除默认自动勾选；修复 deselectAll 逻辑；修复 ConfirmPage 数据丢失（遍历 decisions 替代 scanResults）；后端测试 104 测全绿；AGENTS.md RULE-08 更新 |
+| 2026-05-22 | 后端调试：修复编译警告 6 项（0 警告）；E2E 16 测从全挂修复到全绿（DatePicker/深色模式/默认勾选移除/ReportPage 重构/ExecutingPage 事件跳转适配）；添加假删除模式（`FRENCH_EXIT_DRY_RUN`）；修复 Logo 遮挡按钮（`pointer-events-none`）；修复扫描暂停无效（`progress_cb` 中检查 `pause_rx`）；release 重新构建 |
 
 ---
 

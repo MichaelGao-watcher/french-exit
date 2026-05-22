@@ -108,6 +108,7 @@ impl SystemScanner {
                     current: processed,
                     total,
                     message: format!("已扫描 {} 个最近文档", processed),
+                    global_percent: None,
                 });
                 report_counter = 0;
             }
@@ -120,6 +121,7 @@ impl SystemScanner {
                 current: processed,
                 total,
                 message: format!("最近文档扫描完成，共 {} 个", processed),
+                global_percent: None,
             });
         }
 
@@ -188,6 +190,7 @@ impl SystemScanner {
                     current: processed,
                     total,
                     message: format!("已扫描 {} 个临时文件", processed),
+                    global_percent: None,
                 });
                 report_counter = 0;
             }
@@ -200,6 +203,7 @@ impl SystemScanner {
                 current: processed,
                 total,
                 message: format!("临时文件扫描完成，共 {} 个", processed),
+                global_percent: None,
             });
         }
 

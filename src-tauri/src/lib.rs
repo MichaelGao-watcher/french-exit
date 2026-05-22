@@ -11,6 +11,7 @@ pub mod webview2_fallback;
 
 #[cfg(not(test))]
 use commands::AppState;
+#[cfg(not(test))]
 use std::sync::Arc;
 
 #[cfg(not(test))]

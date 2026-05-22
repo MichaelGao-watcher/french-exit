@@ -206,6 +206,7 @@ impl FileSystemScanner {
                 current,
                 total,
                 message: format!("发现微信聊天记录: {}", wxid),
+                global_percent: None,
             });
         }
 
@@ -293,6 +294,7 @@ impl FileSystemScanner {
                     current: processed.min(total_estimate),
                     total: total_estimate,
                     message: format!("已扫描 {} 个文件", processed),
+                    global_percent: None,
                 });
                 report_counter = 0;
             }
@@ -305,6 +307,7 @@ impl FileSystemScanner {
                 current: processed,
                 total: total_estimate.max(processed),
                 message: format!("目录扫描完成，共 {} 个文件", processed),
+                global_percent: None,
             });
         }
 

@@ -1,4 +1,4 @@
-import { test, expect, createMockTraceItems } from "./fixtures";
+import { test, expect, createMockTraceItems, fillDatePicker } from "./fixtures";
 
 /**
  * 错误边界 E2E
@@ -25,16 +25,17 @@ test.describe("错误边界", () => {
       });
     });
 
-    await page.fill('#start-date', '2026-01-01');
+    await fillDatePicker(page, '2026-01-01');
     await page.click('button:has-text("开始扫描")');
 
     await expect(page.locator('text=扫描服务未启动')).toBeVisible();
     // 页面应保持在 InputPage
-    await expect(page.locator('h1')).toContainText("French Exit");
+    await expect(page.locator('text=French Exit').first()).toBeVisible();
   });
 
   test("get_scan_results 失败时 ResultsPage 显示错误", async ({ page, emitEvent }) => {
     await page.goto("/");
+    await page.click('button:has-text("开始使用")');
 
     let callCount = 0;
     await page.evaluate((items) => {
@@ -63,7 +64,7 @@ test.describe("错误边界", () => {
       });
     }, createMockTraceItems());
 
-    await page.fill('#start-date', '2026-01-01');
+    await fillDatePicker(page, '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
 
@@ -73,6 +74,7 @@ test.describe("错误边界", () => {
 
   test("submit_decisions 失败时 ConfirmPage 显示错误", async ({ page, emitEvent }) => {
     await page.goto("/");
+    await page.click('button:has-text("开始使用")');
 
     await page.evaluate((items) => {
       let scanCompleted = false;
@@ -97,11 +99,13 @@ test.describe("错误边界", () => {
       });
     }, createMockTraceItems());
 
-    await page.fill('#start-date', '2026-01-01');
+    await fillDatePicker(page, '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
 
     await expect(page.locator('h2:has-text("发现")')).toBeVisible();
+    // 已移除默认勾选，需手动勾选才能进入下一步
+    await page.locator('input[type="checkbox"]').first().click();
     await page.click('button:has-text("下一步：确认执行")');
     await expect(page.locator('h2:has-text("最终确认")')).toBeVisible();
 
@@ -115,6 +119,7 @@ test.describe("错误边界", () => {
 
   test("start_execution 失败时返回 ConfirmPage", async ({ page, emitEvent }) => {
     await page.goto("/");
+    await page.click('button:has-text("开始使用")');
 
     await page.evaluate((items) => {
       let scanCompleted = false;
@@ -141,10 +146,12 @@ test.describe("错误边界", () => {
       });
     }, createMockTraceItems());
 
-    await page.fill('#start-date', '2026-01-01');
+    await fillDatePicker(page, '2026-01-01');
     await page.click('button:has-text("开始扫描")');
     await emitEvent("scan_progress", { type: "ScanCompleted" });
 
+    // 已移除默认勾选，需手动勾选才能进入下一步
+    await page.locator('input[type="checkbox"]').first().click();
     await page.click('button:has-text("下一步：确认执行")');
     await page.click('button:has-text("确认执行")');
     await page.click('button:has-text("确定继续")');
