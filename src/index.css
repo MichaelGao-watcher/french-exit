@@ -13,50 +13,82 @@
   }
 }
 
+@keyframes pulse-amber {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes blink-caret {
+  0%, 100% { border-color: transparent; }
+  50% { border-color: #f59e0b; }
+}
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.75rem;
+    /* 精密仪器风（Precision Instrument）色板 — 深炭黑 + 琥珀 + 冷白 */
+    --background: 240 33% 3%;        /* #0a0a0f 深炭黑 */
+    --foreground: 240 7% 92%;        /* #e8e8ec 冷白 */
+    --card: 240 25% 9%;              /* #12121c 仪表板面板 */
+    --card-foreground: 240 7% 92%;
+    --popover: 240 25% 9%;
+    --popover-foreground: 240 7% 92%;
+    --primary: 38 92% 50%;           /* #f59e0b 琥珀色 */
+    --primary-foreground: 240 33% 3%;
+    --secondary: 240 20% 12%;        /* #1a1a24 细线分隔 */
+    --secondary-foreground: 240 7% 92%;
+    --muted: 240 20% 12%;
+    --muted-foreground: 240 5% 45%;  /* #6b6b78 状态文字 */
+    --accent: 38 92% 50%;            /* 琥珀强调 */
+    --accent-foreground: 240 33% 3%;
+    --destructive: 0 84% 60%;        /* #ef4444 危险红，仅用于不可逆操作 */
+    --destructive-foreground: 240 7% 92%;
+    --border: 240 20% 12%;           /* 细线分隔 */
+    --input: 240 20% 15%;
+    --ring: 38 92% 50%;              /* 琥珀聚焦环 */
+    --radius: 0.5rem;                /* 仪器圆角，比默认更克制 */
   }
 
+  /* French Exit 固定深色主题，不跟随系统 */
   .dark {
-    --background: 0 0% 0%;
-    --foreground: 210 40% 98%;
-    --card: 0 0% 5%;
-    --card-foreground: 210 40% 98%;
-    --popover: 0 0% 5%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 0 0% 10%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 40%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 0 0% 80%;
+    --background: 240 33% 3%;
+    --foreground: 240 7% 92%;
+    --card: 240 25% 9%;
+    --card-foreground: 240 7% 92%;
+    --popover: 240 25% 9%;
+    --popover-foreground: 240 7% 92%;
+    --primary: 38 92% 50%;
+    --primary-foreground: 240 33% 3%;
+    --secondary: 240 20% 12%;
+    --secondary-foreground: 240 7% 92%;
+    --muted: 240 20% 12%;
+    --muted-foreground: 240 5% 45%;
+    --accent: 38 92% 50%;
+    --accent-foreground: 240 33% 3%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 240 7% 92%;
+    --border: 240 20% 12%;
+    --input: 240 20% 15%;
+    --ring: 38 92% 50%;
   }
 }
 
@@ -66,7 +98,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  h1, h2, h3, h4, h5, h6, .font-mono-heading {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   }
 }
 
@@ -77,5 +113,11 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+  .animate-pulse-amber {
+    animation: pulse-amber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .animate-page-enter {
+    animation: page-enter 0.3s ease-out forwards;
   }
 }

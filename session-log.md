@@ -440,3 +440,21 @@
 **遗留问题 / 下轮开始点**：
 - release/ 目录中的 exe 尚未重新构建（前端无变更但后端有变更，建议重新打包）
 - 用户如需继续调整 UI/UX，直接给出具体修改指令
+
+---
+
+### 2026-05-26 14:00-14:10
+
+**目标**：运行 `python $SOP_SKELETON_PATH/scripts/init-skeleton.py`
+
+**实际完成**：
+- ❌ 无法执行，`SOP_SKELETON_PATH` 环境变量未设置
+- ✅ 用户触发存档流程
+
+**关键决策**：无
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：`SOP_SKELETON_PATH` 未设置 → 解决：用户需先 `export SOP_SKELETON_PATH=...` 或指定完整路径
+
+**遗留问题 / 下轮开始点**：
+- 如需要使用 `init-skeleton.py`，需先设置 `SOP_SKELETON_PATH` 环境变量
