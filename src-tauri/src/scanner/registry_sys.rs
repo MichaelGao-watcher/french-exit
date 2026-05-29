@@ -154,6 +154,8 @@ fn scan_key(hkey: HKEY, subpath: &str, items: &mut Vec<TraceItem>) -> Result<(),
                             inferred: true,    // RULE-10 硬规则
                             risk_note: Some(RISK_NOTE.to_string()), // RULE-10 硬规则
                             suggested_action: Some(Action::Delete),
+                            source: "other".to_string(),
+                            file_type: "other".to_string(),
                         });
                     }
                 }

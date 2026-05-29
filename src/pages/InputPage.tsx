@@ -2,9 +2,10 @@
  * 输入页（InputPage）
  *
  * 用户进入应用后的首个页面，负责收集入职日期并启动扫描。
- * 设计遵循 Apple Design：大圆角、留白、毛玻璃质感、清晰的视觉层级。
+ * 极简苹果风：纯黑白、细体字体、大留白。
  */
 import { useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useAppState } from "../store/AppContext";
 import { startScan } from "../api/commands";
 import { DatePicker } from "../components/DatePicker";
@@ -16,6 +17,29 @@ function normalizeDate(dateStr: string): string {
   if (/^\d{4}-\d{2}$/.test(dateStr)) return `${dateStr}-01`;
   return dateStr;
 }
+
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.5,
+    },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 12 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.7,
+      ease: [0.4, 0, 0.2, 1],
+    },
+  },
+};
 
 export function InputPage() {
   const { state, dispatch } = useAppState();
@@ -40,7 +64,6 @@ export function InputPage() {
     if (!dateStr) {
       return "请选择时间";
     }
-    // UI 层面已完全阻止未来日期选择，此处保留兜底
     const fullDate = normalizeDate(dateStr);
     const inputDate = new Date(fullDate + "T00:00:00");
     const today = new Date(todayStr + "T00:00:00");
@@ -80,10 +103,18 @@ export function InputPage() {
   const canStart = Boolean(state.startDate) && !isLoading;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh]">
+    <motion.div
+      className="flex flex-col items-center justify-center min-h-[80vh]"
+      variants={container}
+      initial="hidden"
+      animate="show"
+    >
       <div className="w-full max-w-lg">
         {/* 输入卡片 */}
-        <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-md p-8 shadow-sm">
+        <motion.div
+          className="rounded-2xl border border-white/10 bg-transparent p-8"
+          variants={item}
+        >
           {/* 日期输入 */}
           <div className="mb-6">
             <DatePicker
@@ -92,41 +123,58 @@ export function InputPage() {
               onChange={handleDateChange}
               placeholder="请选择时间"
             />
-            <p className="mt-1.5 text-xs text-muted-foreground">
+            <p className="mt-1.5 text-xs text-muted-foreground font-light">
               系统将扫描该时间之后产生的个人文件与痕迹
             </p>
           </div>
 
           {/* 开始按钮 */}
-          <button
+          <motion.button
             onClick={handleStart}
             disabled={!canStart}
             className={`
-              w-full rounded-xl px-8 py-3 font-medium text-white
-              transition-all duration-200
+              w-full rounded-full px-8 py-3 font-light
+              transition-all duration-300 ease-out
               ${
                 canStart
-                  ? "bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-md hover:shadow-lg"
-                  : "bg-blue-600/50 opacity-50 cursor-not-allowed"
+                  ? "text-black bg-white hover:bg-white/90 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                  : "bg-white/20 text-white/40 cursor-not-allowed"
               }
             `}
+            whileHover={canStart ? { scale: 1.01 } : {}}
+            whileTap={canStart ? { scale: 0.99 } : {}}
           >
-            {isLoading ? "正在启动…" : "开始扫描"}
-          </button>
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                正在启动…
+              </span>
+            ) : (
+              "开始扫描"
+            )}
+          </motion.button>
 
           {/* 错误提示 */}
           {state.error && (
-            <p className="mt-4 text-sm text-center">
+            <motion.p
+              className="mt-4 text-sm text-center text-white/70"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
               {state.error}
-            </p>
+            </motion.p>
           )}
-        </div>
+        </motion.div>
 
         {/* 底部说明 */}
-        <p className="mt-6 text-center text-xs text-muted-foreground">
+        <motion.p
+          className="mt-6 text-center text-xs text-muted-foreground font-light"
+          variants={item}
+        >
           所有操作在本地完成，不会上传任何数据
-        </p>
+        </motion.p>
       </div>
-    </div>
+    </motion.div>
   );
 }

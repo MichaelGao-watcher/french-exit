@@ -256,6 +256,8 @@ mod tests {
                 inferred: false,
                 risk_note: None,
                 suggested_action: Some(Action::Delete),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             });
         }
 
@@ -386,6 +388,8 @@ mod tests {
             inferred: true,
             risk_note: Some("高风险".to_string()),
             suggested_action: Some(Action::DeleteOrPack),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         }];
 
         store.save_scan_batch(&items).unwrap();

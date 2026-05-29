@@ -303,6 +303,8 @@ mod tests {
                     inferred: false,
                     risk_note: None,
                     suggested_action: Some(Action::Delete),
+                    source: "other".to_string(),
+                    file_type: "other".to_string(),
                 })
                 .collect();
             Self {

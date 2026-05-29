@@ -7,6 +7,7 @@
  * 3. 轮询 session state，扫描完成后自动跳转到 results
  */
 import { useEffect, useRef, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useAppState } from "../store/AppContext";
 import { getSessionState, pauseScan, resumeScan, listenScanProgress, setResourceConfig } from "../api/commands";
 
@@ -168,9 +169,37 @@ export function ScanPage() {
     }
   }, [state.resourceConfig, dispatch]);
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.3,
+      },
+    },
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 12 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.7,
+        ease: [0.4, 0, 0.2, 1],
+      },
+    },
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] max-w-lg mx-auto">
-      <div className="w-full bg-card/80 backdrop-blur-xl rounded-2xl p-8 shadow-lg border border-border">
+    <motion.div
+      className="flex flex-col items-center justify-center min-h-[70vh] max-w-lg mx-auto"
+      variants={container}
+      initial="hidden"
+      animate="show"
+    >
+      <motion.div variants={item} className="w-full bg-card/80 backdrop-blur-xl rounded-2xl p-8 shadow-lg border border-border">
         <h2 className="text-2xl font-semibold mb-2 text-center">
           {state.isPaused ? "扫描已暂停" : "正在扫描…"}
         </h2>
@@ -255,7 +284,7 @@ export function ScanPage() {
         {state.error && (
           <p className="mt-4 text-sm text-center">{state.error}</p>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

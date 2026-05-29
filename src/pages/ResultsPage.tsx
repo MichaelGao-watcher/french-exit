@@ -10,7 +10,8 @@
  * 6. 应用默认勾选规则（RULE-02 / RULE-03）
  * 7. 支持文件预览弹窗
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { useAppState } from "../store/AppContext";
 import { getScanResults, getAllScanSummaries, openPath } from "../api/commands";
 import type { TraceCategory, TraceItem, Decision } from "../types";
@@ -27,6 +28,27 @@ const CATEGORIES: { key: TraceCategory | "all"; label: string }[] = [
   { key: "DevTools", label: "开发工具" },
   { key: "EnvVar", label: "环境变量" },
 ];
+
+const FILE_TYPE_GROUPS: { key: string; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "photo", label: "照片/图片" },
+  { key: "video", label: "视频" },
+  { key: "audio", label: "音频" },
+  { key: "work_doc", label: "工作文档" },
+  { key: "code", label: "代码" },
+  { key: "archive", label: "压缩包" },
+  { key: "design", label: "设计文件" },
+  { key: "executable", label: "程序" },
+  { key: "temp", label: "临时文件" },
+  { key: "other", label: "其他" },
+];
+
+const SOURCE_LABELS: Record<string, string> = {
+  personal_desktop: "桌面文件",
+  personal_downloads: "下载文件",
+  personal_documents: "文档目录",
+  other: "其他位置",
+};
 
 function getDefaultAction(item: TraceItem): "Delete" | "Preserve" | "Pack" | null {
   if (item.suggested_action === "DeleteOrPack" || item.suggested_action === "Delete") {
@@ -58,6 +80,7 @@ export function ResultsPage() {
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFileType, setActiveFileType] = useState<string>("all");
   const [previewItem, setPreviewItem] = useState<TraceItem | null>(null);
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -92,18 +115,28 @@ export function ResultsPage() {
   // 默认勾选逻辑已移除：所有勾选必须由用户显式操作，防止误删
   // RULE-02 / RULE-03 的默认行为改为仅在用户手动勾选时应用建议动作
 
-  const filteredItems =
-    activeCategory === "all"
+  const filteredItems = useMemo(() => {
+    let items = activeCategory === "all"
       ? state.scanResults
       : state.scanResults.filter((item) => item.category === activeCategory);
 
-  const searchedItems = searchQuery.trim()
-    ? filteredItems.filter(
+    // 文件类型筛选（仅对 FileSystem 类别生效）
+    if (activeCategory === "FileSystem" && activeFileType !== "all") {
+      items = items.filter((item) => item.file_type === activeFileType);
+    }
+
+    // 搜索过滤
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      items = items.filter(
         (item) =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (item.path && item.path.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : filteredItems;
+          item.name.toLowerCase().includes(q) ||
+          (item.path && item.path.toLowerCase().includes(q))
+      );
+    }
+
+    return items;
+  }, [state.scanResults, activeCategory, activeFileType, searchQuery]);
 
   const selectedCount = selectedIds.size;
   const totalCount = state.scanTotal;
@@ -131,11 +164,11 @@ export function ResultsPage() {
   };
 
   const selectAllPage = () => {
-    const ids = new Set(searchedItems.map((i) => i.id));
+    const ids = new Set(filteredItems.map((i) => i.id));
     setSelectedIds(ids);
 
     const newDecisions = new Map(state.decisions);
-    searchedItems.forEach((item) => {
+    filteredItems.forEach((item) => {
       if (item.category === "EnvVar") return;
       const action = getDefaultAction(item);
       if (action) {
@@ -171,6 +204,8 @@ export function ResultsPage() {
           inferred: false,
           risk_note: null,
           suggested_action: summary.suggested_action,
+          source: "other",
+          file_type: "other",
         });
       });
 
@@ -253,20 +288,48 @@ export function ResultsPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [previewItem]);
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.3,
+      },
+    },
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 12 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.7,
+        ease: [0.4, 0, 0.2, 1],
+      },
+    },
+  };
+
   return (
-    <div className="flex flex-col min-h-[70vh] max-w-3xl mx-auto">
+    <motion.div
+      className="flex flex-col min-h-[70vh] max-w-3xl mx-auto"
+      variants={container}
+      initial="hidden"
+      animate="show"
+    >
       {/* 标题栏 */}
-      <div className="mb-6">
+      <motion.div variants={item} className="mb-6">
         <h2 className="text-2xl font-semibold">发现 {totalCount} 条痕迹</h2>
         <p className="text-muted-foreground mt-1">已选择 {selectedCount} 条</p>
-      </div>
+      </motion.div>
 
       {/* 分类 Tab */}
       <div className="flex flex-wrap gap-2 mb-4">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.key}
-            onClick={() => setActiveCategory(cat.key)}
+            onClick={() => { setActiveCategory(cat.key); setActiveFileType("all"); }}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
               activeCategory === cat.key
                 ? "bg-blue-600 text-white"
@@ -277,6 +340,25 @@ export function ResultsPage() {
           </button>
         ))}
       </div>
+
+      {/* 二级 Tab：文件类型筛选（仅 FileSystem 类别） */}
+      {activeCategory === "FileSystem" && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {FILE_TYPE_GROUPS.map((group) => (
+            <button
+              key={group.key}
+              onClick={() => setActiveFileType(activeFileType === group.key ? "all" : group.key)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                activeFileType === group.key
+                  ? "bg-primary/20 text-primary"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {group.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* 搜索栏 */}
       <div className="relative mb-4">
@@ -328,12 +410,109 @@ export function ResultsPage() {
 
       {/* 列表区域 */}
       <div className="flex-1 space-y-2 mb-6">
-        {searchedItems.length === 0 ? (
+        {filteredItems.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             {searchQuery.trim() ? "无匹配结果" : "该分类下暂无痕迹"}
           </div>
+        ) : activeCategory === "FileSystem" ? (
+          (() => {
+            const groups = new Map<string, typeof filteredItems>();
+            filteredItems.forEach((item) => {
+              const src = item.source || "other";
+              if (!groups.has(src)) groups.set(src, []);
+              groups.get(src)!.push(item);
+            });
+            return Array.from(groups.entries()).map(([source, items]) => (
+              <div key={source} className="mb-4">
+                <div className="text-xs font-medium text-muted-foreground mb-2 px-1">
+                  {SOURCE_LABELS[source] || source} ({items.length})
+                </div>
+                <div className="space-y-2">
+                  {items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 bg-card/80 backdrop-blur-xl rounded-xl p-4 border border-border shadow-sm hover:shadow-md transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => toggleItem(item.id)}
+                        className="w-4 h-4 rounded border-border text-blue-600 focus:ring-blue-600 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate" title={item.name}>{item.name}</span>
+                          {item.inferred && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded">
+                              推断
+                            </span>
+                          )}
+                        </div>
+                        {item.path ? (
+                          <button
+                            onClick={() => openPath(item.path!)}
+                            className="text-xs text-muted-foreground truncate mt-0.5 text-left hover:text-blue-400 hover:underline transition block w-full"
+                            title="点击打开所在文件夹"
+                          >
+                            {item.path}
+                          </button>
+                        ) : (
+                          <div className="text-xs text-muted-foreground truncate mt-0.5">-</div>
+                        )}
+                        <div className="text-xs text-muted-foreground mt-0.5 flex gap-3">
+                          <span>{formatBytes(item.size_bytes)}</span>
+                          <span className="text-foreground/70">修改于 {formatDate(item.modified_at)}</span>
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-2">
+                        {item.path && (
+                          <button
+                            onClick={() => openPath(item.path!)}
+                            className="px-2 py-1 text-xs rounded-lg bg-muted hover:bg-muted/80 transition"
+                            title="打开所在文件夹"
+                          >
+                            打开
+                          </button>
+                        )}
+                        {canPreview(item) && (
+                          <button
+                            onClick={() => handlePreview(item)}
+                            className="px-2 py-1 text-xs rounded-lg bg-muted hover:bg-muted/80 transition"
+                          >
+                            预览
+                          </button>
+                        )}
+                        {item.risk_note && (
+                          <span title={item.risk_note} className="text-yellow-500 text-lg">
+                            ⚠️
+                          </span>
+                        )}
+                        {state.decisions.has(item.id) && (
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                              state.decisions.get(item.id)?.action === "Delete"
+                                ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
+                                : state.decisions.get(item.id)?.action === "Preserve"
+                                ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                                : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                            }`}
+                          >
+                            {state.decisions.get(item.id)?.action === "Delete"
+                              ? "删除"
+                              : state.decisions.get(item.id)?.action === "Preserve"
+                              ? "保留"
+                              : "打包"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ));
+          })()
         ) : (
-          searchedItems.map((item) => (
+          filteredItems.map((item) => (
             <div
               key={item.id}
               className="flex items-center gap-3 bg-card/80 backdrop-blur-xl rounded-xl p-4 border border-border shadow-sm hover:shadow-md transition"
@@ -434,7 +613,7 @@ export function ResultsPage() {
 
       {/* 批量操作栏 + 下一步按钮 */}
       <div className="sticky bottom-0 bg-background/90 backdrop-blur-xl border-t border-border -mx-4 px-4 py-4 flex flex-col gap-4">
-        {searchedItems.length > 0 && (
+        {filteredItems.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex gap-2">
               <button
@@ -589,6 +768,6 @@ export function ResultsPage() {
       {state.error && (
         <p className="mt-4 text-sm text-center">{state.error}</p>
       )}
-    </div>
+    </motion.div>
   );
 }

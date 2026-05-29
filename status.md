@@ -156,6 +156,7 @@ e2e/
 | 2026-05-22 | 后端调试：修复编译警告 6 项（0 警告）；E2E 16 测从全挂修复到全绿（DatePicker/深色模式/默认勾选移除/ReportPage 重构/ExecutingPage 事件跳转适配）；添加假删除模式（`FRENCH_EXIT_DRY_RUN`）；修复 Logo 遮挡按钮（`pointer-events-none`）；修复扫描暂停无效（`progress_cb` 中检查 `pause_rx`）；release 重新构建 |
 | 2026-05-22 | Bug 修复：扫描进度条"一秒到 100%"。后端 ScannerRegistry 新增全局加权进度计算（fs 50% + browser/system 各 15% + 其他各 5%），`ScanProgress` / `ProgressEvent` / `ScanPage.tsx` 全链路适配；后端 129 测、前端 51 测全绿
 | 2026-05-26 | 存档：UI/UX 精密仪器风迭代（色板/字体/动效约束落地）+ `SOP_SKELETON_PATH` 环境变量未设置提示 |
+| 2026-05-29 | UI/UX 动画迭代：全页面浮动动画（8 个文件统一 bottom-up 浮现）；修复大 Logo 居中 + 显示逻辑；PowerShell 启动 Vite 技巧记入 lessons-learned；母库经验同步（9 条新增） |
 
 ---
 

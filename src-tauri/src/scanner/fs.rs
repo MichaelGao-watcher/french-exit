@@ -2,6 +2,7 @@ use crate::scanner::{ScanError, ScanProgress, Scanner};
 use crate::types::{Action, ScanContext, TraceCategory, TraceItem};
 use chrono::{DateTime, Local, NaiveDate};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -141,6 +142,66 @@ impl FileSystemScanner {
         Some(modified.into())
     }
 
+    /// 根据路径判断来源分类
+    ///
+    /// 个人目录（Desktop/Downloads/Documents）返回 personal_* 前缀，
+    /// 其他位置返回 "other"。
+    fn classify_source(path: &Path, user_home: &Path) -> String {
+        let path_str = path.to_string_lossy().to_lowercase();
+        let home_str = user_home.to_string_lossy().to_lowercase();
+        if path_str.starts_with(&format!("{}\\desktop", home_str)) {
+            "personal_desktop".to_string()
+        } else if path_str.starts_with(&format!("{}\\downloads", home_str)) {
+            "personal_downloads".to_string()
+        } else if path_str.starts_with(&format!("{}\\documents", home_str)) {
+            "personal_documents".to_string()
+        } else {
+            "other".to_string()
+        }
+    }
+
+    /// 根据扩展名判断文件类型分类
+    fn classify_file_type(path: &Path) -> String {
+        let ext = path
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        match ext.as_str() {
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "webp" | "tiff" | "tif" | "raw" | "heic"
+            | "heif" | "ico" | "dds" | "svg" => "photo".to_string(),
+            "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" | "mpg" | "mpeg"
+            | "3gp" => "video".to_string(),
+            "mp3" | "wav" | "flac" | "aac" | "ogg" | "wma" | "m4a" | "opus" | "mid"
+            | "midi" => "audio".to_string(),
+            "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "odp" | "ods" | "odt" | "rtf"
+            | "csv" | "pdf" => "work_doc".to_string(),
+            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "tgz" | "iso" | "dmg" => {
+                "archive".to_string()
+            }
+            "psd" | "ai" | "indd" | "sketch" | "fig" | "xd" | "afdesign" | "afphoto" | "kra"
+            | "xcf" | "blend" | "max" | "dwg" | "dxf" => "design".to_string(),
+            "exe" | "msi" | "appx" | "msix" | "dll" | "sys" | "com" | "scr" | "cpl" => {
+                "executable".to_string()
+            }
+            "tmp" | "temp" | "bak" | "old" | "swp" | "swo" | "cache" | "log" => "temp".to_string(),
+            _ => {
+                // 代码文件
+                if matches!(
+                    ext.as_str(),
+                    "js" | "ts" | "tsx" | "jsx" | "py" | "rs" | "java" | "c" | "cpp" | "h"
+                        | "hpp" | "cs" | "go" | "rb" | "php" | "html" | "css" | "scss"
+                        | "less" | "sql" | "sh" | "bat" | "ps1" | "vue" | "svelte" | "swift"
+                        | "kt" | "dart" | "r" | "lua" | "zig" | "scala" | "ex" | "exs"
+                        | "erl" | "hs" | "ml" | "clj"
+                ) {
+                    "code".to_string()
+                } else {
+                    "other".to_string()
+                }
+            }
+        }
+    }
+
     /// 生成文件唯一 ID（基于路径的简单哈希）
     fn generate_file_id(path: &Path) -> String {
         let mut hasher = DefaultHasher::new();
@@ -198,6 +259,8 @@ impl FileSystemScanner {
                 inferred: false,
                 risk_note: Some("微信聊天记录属于私人内容，建议处理。".to_string()),
                 suggested_action: Some(Action::DeleteOrPack), // RULE-03
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             });
 
             current += 1;
@@ -215,11 +278,15 @@ impl FileSystemScanner {
 
     /// 扫描普通文件目录（Desktop / Downloads）
     ///
-    /// 递归遍历，排除系统目录/自身目录/隐藏文件，过滤入职日期前的文件。
+    /// 递归遍历，排除系统目录/自身目录/隐藏文件。
+    ///
+    /// - `apply_date_filter=true`：按入职日期过滤（仅修改日期 >= start_date 的文件）
+    /// - `apply_date_filter=false`：不过滤（个人目录全量扫描）
     fn scan_directory(
         &self,
         ctx: &ScanContext,
         dir: &Path,
+        apply_date_filter: bool,
         progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut items = Vec::new();
@@ -254,13 +321,18 @@ impl FileSystemScanner {
 
             let path = entry.path();
 
-            // 入职日期过滤：文件修改日期 >= start_date
-            if let Some(file_date) = Self::modified_date(path) {
-                if file_date < ctx.start_date {
-                    continue;
+            // 来源分类与文件类型分类
+            let source = Self::classify_source(path, &ctx.user_home);
+            let file_type = Self::classify_file_type(path);
+
+            // 入职日期过滤（仅当 apply_date_filter=true 且不是个人目录时）
+            if apply_date_filter && !source.starts_with("personal_") {
+                if let Some(file_date) = Self::modified_date(path) {
+                    if file_date < ctx.start_date {
+                        continue;
+                    }
                 }
             }
-            // 如果无法获取修改时间，默认保留（不过滤掉）
 
             let metadata = match entry.metadata() {
                 Ok(m) => m,
@@ -282,6 +354,8 @@ impl FileSystemScanner {
                 inferred: false,
                 risk_note: None,
                 suggested_action: Some(Action::DeleteOrPack),
+                source,
+                file_type,
             });
 
             processed += 1;
@@ -347,20 +421,58 @@ impl Scanner for FileSystemScanner {
         progress: &(dyn Fn(ScanProgress) + Send + Sync),
     ) -> Result<Vec<TraceItem>, ScanError> {
         let mut all_items = Vec::new();
+        let mut scanned_paths: HashSet<PathBuf> = HashSet::new();
 
-        // 步骤 1 & 2：优先扫描微信目录（RULE-03）
+        // 步骤 1 & 2：优先扫描微信目录（RULE-03，无日期过滤）
         let wechat_items = self.scan_wechat(ctx, progress)?;
         all_items.extend(wechat_items);
 
-        // 步骤 3：全盘扫描所有可用盘符
+        // 步骤 3：扫描个人目录（无日期过滤，位置优先）
+        let personal_dirs = [
+            ctx.user_home.join("Desktop"),
+            ctx.user_home.join("Downloads"),
+            ctx.user_home.join("Documents"),
+        ];
+        for dir in &personal_dirs {
+            if dir.exists() && dir.is_dir() {
+                let items = self.scan_directory(ctx, dir, false, progress)?;
+                all_items.extend(items);
+                // 记录已扫描的目录（用于去重）
+                if let Ok(canonical) = std::fs::canonicalize(dir) {
+                    scanned_paths.insert(canonical);
+                }
+            }
+        }
+
+        // 步骤 4：全盘扫描（有日期过滤），精细去重
         let drives = Self::get_all_drives();
         for drive in &drives {
-            // 跳过系统盘根目录本身，但扫描其下非系统子目录
             if Self::is_system_path(drive) {
                 continue;
             }
-            let items = self.scan_directory(ctx, drive, progress)?;
-            all_items.extend(items);
+            // 遍历盘符下一级子目录，跳过已扫描的个人目录
+            for entry in walkdir::WalkDir::new(drive)
+                .max_depth(1)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let path = entry.path();
+                if !entry.file_type().is_dir() {
+                    continue;
+                }
+                // 跳过系统目录
+                if Self::is_system_path(path) {
+                    continue;
+                }
+                // 精细去重：检查是否在已扫描路径下
+                if let Ok(canonical) = std::fs::canonicalize(path) {
+                    if scanned_paths.iter().any(|p| canonical.starts_with(p)) {
+                        continue;
+                    }
+                }
+                let items = self.scan_directory(ctx, path, true, progress)?;
+                all_items.extend(items);
+            }
         }
 
         Ok(all_items)
@@ -440,7 +552,7 @@ mod tests {
 
         let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
         let scanner = FileSystemScanner::new();
-        let items = scanner.scan_directory(&ctx, &dir, &no_op_progress).unwrap();
+        let items = scanner.scan_directory(&ctx, &dir, true, &no_op_progress).unwrap();
 
         assert_eq!(items.len(), 3, "应扫描到 3 个文件");
         let names: std::collections::HashSet<_> = items.iter().map(|i| i.name.as_str()).collect();
@@ -468,7 +580,7 @@ mod tests {
 
         let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
         let scanner = FileSystemScanner::new();
-        let items = scanner.scan_directory(&ctx, &dir, &no_op_progress).unwrap();
+        let items = scanner.scan_directory(&ctx, &dir, true, &no_op_progress).unwrap();
 
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].name, "normal.txt");
@@ -481,13 +593,29 @@ mod tests {
         std::fs::create_dir(&dir).unwrap();
         std::fs::write(dir.join("file.txt"), "a").unwrap();
 
-        // start_date 设为明天，所有现有文件都应在入职前
+        // start_date 设为明天，apply_date_filter=true，所有现有文件都应在入职前
         let tomorrow = Local::now().date_naive() + Duration::days(1);
         let ctx = make_scan_ctx(&temp_dir, tomorrow);
         let scanner = FileSystemScanner::new();
-        let items = scanner.scan_directory(&ctx, &dir, &no_op_progress).unwrap();
+        let items = scanner.scan_directory(&ctx, &dir, true, &no_op_progress).unwrap();
 
         assert_eq!(items.len(), 0, "入职日期后的文件应被过滤");
+    }
+
+    #[test]
+    fn test_scan_directory_no_date_filter_includes_old_files() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dir = temp_dir.path().join("scan-target");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join("file.txt"), "a").unwrap();
+
+        // start_date 设为明天，但 apply_date_filter=false，不应过滤
+        let tomorrow = Local::now().date_naive() + Duration::days(1);
+        let ctx = make_scan_ctx(&temp_dir, tomorrow);
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_directory(&ctx, &dir, false, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 1, "apply_date_filter=false 时不应过滤文件");
     }
 
     #[test]
@@ -498,7 +626,7 @@ mod tests {
 
         let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
         let scanner = FileSystemScanner::new();
-        let items = scanner.scan_directory(&ctx, &dir, &no_op_progress).unwrap();
+        let items = scanner.scan_directory(&ctx, &dir, true, &no_op_progress).unwrap();
 
         assert_eq!(items.len(), 0);
     }
@@ -551,5 +679,175 @@ mod tests {
         let items = scanner.scan_wechat(&ctx, &no_op_progress).unwrap();
 
         assert_eq!(items.len(), 0);
+    }
+
+    #[test]
+    fn test_classify_source_personal_dirs() {
+        let user_home = Path::new("C:\\Users\\Test");
+        assert_eq!(
+            FileSystemScanner::classify_source(
+                &Path::new("C:\\Users\\Test\\Desktop\\file.txt"),
+                user_home
+            ),
+            "personal_desktop"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_source(
+                &Path::new("C:\\Users\\Test\\Downloads\\doc.pdf"),
+                user_home
+            ),
+            "personal_downloads"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_source(
+                &Path::new("C:\\Users\\Test\\Documents\\notes.txt"),
+                user_home
+            ),
+            "personal_documents"
+        );
+    }
+
+    #[test]
+    fn test_classify_source_other_dirs() {
+        let user_home = Path::new("C:\\Users\\Test");
+        assert_eq!(
+            FileSystemScanner::classify_source(
+                &Path::new("D:\\Projects\\work"),
+                user_home
+            ),
+            "other"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_source(
+                &Path::new("C:\\Users\\Test\\AppData\\cache"),
+                user_home
+            ),
+            "other"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_type_photos() {
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("photo.jpg")),
+            "photo"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("image.PNG")),
+            "photo"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("icon.svg")),
+            "photo"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_type_videos() {
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("video.mp4")),
+            "video"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("clip.avi")),
+            "video"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_type_work_docs() {
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("report.docx")),
+            "work_doc"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("data.xlsx")),
+            "work_doc"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("slides.pptx")),
+            "work_doc"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("document.pdf")),
+            "work_doc"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_type_code() {
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("main.rs")),
+            "code"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("app.py")),
+            "code"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("index.html")),
+            "code"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_type_archives() {
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("backup.zip")),
+            "archive"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("archive.7z")),
+            "archive"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_type_temp() {
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("temp.tmp")),
+            "temp"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("backup.bak")),
+            "temp"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_type_other() {
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("unknown.xyz")),
+            "other"
+        );
+        assert_eq!(
+            FileSystemScanner::classify_file_type(Path::new("noextension")),
+            "other"
+        );
+    }
+
+    #[test]
+    fn test_scan_results_have_source_and_file_type() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dir = temp_dir.path().join("scan-target");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join("photo.jpg"), "fake-image").unwrap();
+        std::fs::write(dir.join("doc.pdf"), "fake-doc").unwrap();
+
+        let ctx = make_scan_ctx(&temp_dir, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+        let scanner = FileSystemScanner::new();
+        let items = scanner.scan_directory(&ctx, &dir, false, &no_op_progress).unwrap();
+
+        assert_eq!(items.len(), 2);
+        for item in &items {
+            assert!(!item.source.is_empty(), "source 不应为空");
+            assert!(!item.file_type.is_empty(), "file_type 不应为空");
+        }
+
+        let jpg_item = items.iter().find(|i| i.name == "photo.jpg").unwrap();
+        assert_eq!(jpg_item.file_type, "photo");
+
+        let pdf_item = items.iter().find(|i| i.name == "doc.pdf").unwrap();
+        assert_eq!(pdf_item.file_type, "work_doc");
     }
 }

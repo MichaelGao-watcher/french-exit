@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface DatePickerProps {
   value: string; // YYYY, YYYY-MM, or YYYY-MM-DD
@@ -126,49 +127,55 @@ export function DatePicker({
     currentValue: string,
     onSelect: (v: string) => void,
   ) => {
-    if (openPanel !== type) return null;
     return (
-      <div
-        className="
-          absolute z-50 mt-1.5 left-0 right-0 
-          rounded-xl border border-border 
-          bg-popover/95 backdrop-blur-xl shadow-lg overflow-hidden
-          animate-[dropdownIn_0.18s_ease-out]
-        "
-      >
-        <div className="max-h-52 overflow-y-auto py-1.5 no-scrollbar">
-          {options.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => {
-                onSelect(opt);
-                setOpenPanel(null);
-              }}
-              className={`
-                w-full px-3 py-2 text-left text-sm transition-colors duration-150
-                ${
-                  opt === currentValue
-                    ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium"
-                    : "text-foreground hover:bg-muted/60"
-                }
-              `}
-            >
-              {opt}
-              {type === "year" && "年"}
-              {type === "month" && "月"}
-              {type === "day" && "日"}
-            </button>
-          ))}
-        </div>
-      </div>
+      <AnimatePresence>
+        {openPanel === type && (
+          <motion.div
+            className="
+              absolute z-50 mt-1.5 left-0 right-0
+              rounded-xl border border-white/10
+              bg-black/95 backdrop-blur-xl overflow-hidden
+            "
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <div className="max-h-52 overflow-y-auto py-1.5 no-scrollbar">
+              {options.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onSelect(opt);
+                    setOpenPanel(null);
+                  }}
+                  className={`
+                    w-full px-3 py-2 text-left text-sm transition-colors duration-200
+                    ${
+                      opt === currentValue
+                        ? "bg-white text-black font-medium"
+                        : "text-foreground hover:bg-white/10"
+                    }
+                  `}
+                >
+                  {opt}
+                  {type === "year" && "年"}
+                  {type === "month" && "月"}
+                  {type === "day" && "日"}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     );
   };
 
   return (
     <div className="relative" ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-foreground mb-2">
+        <label className="block text-sm font-light text-foreground mb-2">
           {label}
         </label>
       )}
@@ -183,31 +190,31 @@ export function DatePicker({
               setOpenPanel(openPanel === "year" ? null : "year")
             }
             className={`
-              w-full rounded-xl border border-input 
-              bg-white/50 dark:bg-black/30
+              w-full rounded-xl border border-white/20
+              bg-transparent
               px-3 py-3 text-left text-sm outline-none
-              focus:ring-2 focus:ring-ring focus:border-transparent
-              transition-all duration-200
+              focus:border-white/40 focus:ring-1 focus:ring-white/20
+              transition-all duration-300
               ${year ? "text-foreground" : "text-muted-foreground"}
             `}
           >
             <span className="flex items-center justify-between">
-              <span>{year ? `${year}年` : "年"}</span>
-              <svg
-                className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
-                  openPanel === "year" ? "rotate-180" : ""
-                }`}
+              <span className="font-light">{year ? `${year}年` : "年"}</span>
+              <motion.svg
+                className="w-3.5 h-3.5 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={1.5}
+                animate={{ rotate: openPanel === "year" ? 180 : 0 }}
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   d="M19 9l-7 7-7-7"
                 />
-              </svg>
+              </motion.svg>
             </span>
           </button>
           {renderPanel("year", years, year, (v) =>
@@ -224,11 +231,11 @@ export function DatePicker({
             }
             disabled={!year}
             className={`
-              w-full rounded-xl border border-input 
-              bg-white/50 dark:bg-black/30
+              w-full rounded-xl border border-white/20
+              bg-transparent
               px-3 py-3 text-left text-sm outline-none
-              focus:ring-2 focus:ring-ring focus:border-transparent
-              transition-all duration-200
+              focus:border-white/40 focus:ring-1 focus:ring-white/20
+              transition-all duration-300
               ${
                 !year
                   ? "opacity-40 cursor-not-allowed text-muted-foreground"
@@ -239,22 +246,22 @@ export function DatePicker({
             `}
           >
             <span className="flex items-center justify-between">
-              <span>{month ? `${month}月` : "月"}</span>
-              <svg
-                className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
-                  openPanel === "month" ? "rotate-180" : ""
-                }`}
+              <span className="font-light">{month ? `${month}月` : "月"}</span>
+              <motion.svg
+                className="w-3.5 h-3.5 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={1.5}
+                animate={{ rotate: openPanel === "month" ? 180 : 0 }}
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   d="M19 9l-7 7-7-7"
                 />
-              </svg>
+              </motion.svg>
             </span>
           </button>
           {renderPanel("month", months, month, (v) =>
@@ -273,11 +280,11 @@ export function DatePicker({
             }
             disabled={!year || !month}
             className={`
-              w-full rounded-xl border border-input 
-              bg-white/50 dark:bg-black/30
+              w-full rounded-xl border border-white/20
+              bg-transparent
               px-3 py-3 text-left text-sm outline-none
-              focus:ring-2 focus:ring-ring focus:border-transparent
-              transition-all duration-200
+              focus:border-white/40 focus:ring-1 focus:ring-white/20
+              transition-all duration-300
               ${
                 !year || !month
                   ? "opacity-40 cursor-not-allowed text-muted-foreground"
@@ -288,22 +295,22 @@ export function DatePicker({
             `}
           >
             <span className="flex items-center justify-between">
-              <span>{day ? `${day}日` : "日"}</span>
-              <svg
-                className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
-                  openPanel === "day" ? "rotate-180" : ""
-                }`}
+              <span className="font-light">{day ? `${day}日` : "日"}</span>
+              <motion.svg
+                className="w-3.5 h-3.5 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={1.5}
+                animate={{ rotate: openPanel === "day" ? 180 : 0 }}
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   d="M19 9l-7 7-7-7"
                 />
-              </svg>
+              </motion.svg>
             </span>
           </button>
           {renderPanel("day", days, day, (v) =>

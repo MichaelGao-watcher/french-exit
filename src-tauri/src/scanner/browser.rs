@@ -188,6 +188,8 @@ impl BrowserScanner {
             inferred: false,
             risk_note: Some("浏览器正在运行，无法读取完整记录".to_string()),
             suggested_action: Some(Action::Delete),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         }
     }
 
@@ -278,6 +280,8 @@ impl BrowserScanner {
                 inferred: false,
                 risk_note: Some("⚠️ 浏览器历史记录可能包含工作相关页面，建议清理".to_string()),
                 suggested_action: Some(Action::Delete),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             });
 
             processed += 1;
@@ -379,6 +383,8 @@ impl BrowserScanner {
                 inferred: false,
                 risk_note: Some("⚠️ 浏览器历史记录可能包含工作相关页面，建议清理".to_string()),
                 suggested_action: Some(Action::Delete),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             });
 
             processed += 1;

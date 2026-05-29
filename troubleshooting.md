@@ -490,3 +490,52 @@
 ## 存档提示
 
 **用户说「存储」时**，AI 应回顾本轮会话内容，评估是否有新的具体报错需要记入本文件。有则按模板追加；没有则跳过。
+---
+
+### PowerShell 执行中文脚本报 "UnexpectedToken" [来源:vibe-coding-project-sop @2026-05-22] [来源:vibe-coding-project-sop @2026-05-29]
+
+| | 内容 |
+|---|---|
+| **现象** | .\start-llm-server.ps1 执行时报错：表达式或语句中包含意外的标记"}"，行号指向 `}` |
+| **原因** | PowerShell 5.1 默认以 Windows-1252 编码读取无 BOM 的 UTF-8 文件，中文字符被错误解码后破坏了字符串引号匹配，导致解析器认为 `}` 位置不对 |
+| **解决** | 给脚本文件添加 UTF-8 BOM（文件头添加字节 EF BB BF）：`printf '\xef\xbb\xbf' > file.ps1 && cat original.ps1 >> file.ps1` |
+| **注意** | PowerShell 7+ 默认支持 UTF-8 无 BOM，但 Windows 10 自带的 PowerShell 5.1 仍受此限制 |
+
+
+---
+
+### GitHub push 报错 `Permission denied (publickey)` [来源:vibe-coding-project-sop @2026-05-23] [来源:vibe-coding-project-sop @2026-05-29]
+
+| | 内容 |
+|---|---|
+| **状态** | 已修复 |
+| **现象** | `git push` 失败，`ssh -T git@github.com` 返回 `Permission denied (publickey)` |
+| **原因** | 1. SSH agent 未加载私钥（`ssh-add -l` 显示 `no identities`）<br>2. GitHub 账户未添加对应公钥 |
+| **解决** | 方案 A（SSH）：`ssh-add ~/.ssh/id_ed25519`，将公钥添加到 GitHub Settings → SSH Keys<br>方案 B（推荐）：改用 HTTPS + GitHub CLI 管理凭证（见下方 `gh auth login` 条目） |
+
+### `gh auth login` 超时：`read tcp ... operation timed out` [来源:vibe-coding-project-sop @2026-05-23] [来源:vibe-coding-project-sop @2026-05-29]
+
+| | 内容 |
+|---|---|
+| **状态** | 已修复 |
+| **现象** | `gh auth login` 报错 `Post "https://github.com/login/device/code": read tcp ...: read: operation timed out` |
+| **原因** | `gh` 底层是 Go 程序，默认直连 GitHub API，不走系统代理。国内网络环境下 GitHub API 可能超时 |
+| **解决** | 设置环境变量后运行：`HTTPS_PROXY=http://127.0.0.1:7897 HTTP_PROXY=http://127.0.0.1:7897 gh auth login` |
+
+### HuggingFace 模型下载连接超时 `curl: (28) Could not connect to server` [来源:vibe-coding-project-sop @2026-05-24] [来源:vibe-coding-project-sop @2026-05-29]
+
+| | 内容 |
+|---|---|
+| **状态** | 已解决 |
+| **现象** | `curl https://huggingface.co/.../resolve/main/...gguf` 长时间无响应后报错 `Failed to connect to huggingface.co port 443 after 21073 ms` |
+| **原因** | 国内网络环境下 HuggingFace 主站被墙或 DNS 污染 |
+| **解决** | 改用国内镜像源：ModelScope（`https://modelscope.cn/models/<namespace>/<model>/resolve/master/<file>.gguf`），实测速度 2.5MB/s+ |
+
+### PowerShell 添加防火墙规则权限不足 `Access is denied` [来源:vibe-coding-project-sop @2026-05-24] [来源:vibe-coding-project-sop @2026-05-29]
+
+| | 内容 |
+|---|---|
+| **状态** | 已知限制 |
+| **现象** | 非管理员身份运行 `start-llm-server.ps1` 时，`New-NetFirewallRule` 报错 `Access is denied` |
+| **原因** | Windows 防火墙规则修改需要管理员权限 |
+| **解决** | 1. 以管理员身份运行一次 PowerShell 执行脚本，添加规则后后续无需管理员<br>2. 或手动在 Windows 防火墙高级设置中添加 11434 TCP 入站规则 |

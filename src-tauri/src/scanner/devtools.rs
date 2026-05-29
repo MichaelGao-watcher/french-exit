@@ -121,6 +121,8 @@ impl Scanner for DevToolsScanner {
                     inferred: false,
                     risk_note: Some("GitHub CLI 配置包含认证凭证和仓库别名".to_string()),
                     suggested_action: Some(Action::Delete),
+                    source: "other".to_string(),
+                    file_type: "other".to_string(),
                 });
             }
         }
@@ -162,6 +164,8 @@ fn check_file(path: &Path) -> Option<TraceItem> {
         inferred: false,
         risk_note: None,
         suggested_action: None,
+        source: "other".to_string(),
+        file_type: "other".to_string(),
     })
 }
 

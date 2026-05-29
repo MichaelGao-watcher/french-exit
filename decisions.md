@@ -378,6 +378,104 @@
 | **后果** | 新增 `ScanProgress.global_percent: Option<u8>` 字段，`ProgressEvent::ScanProgress` 同步添加；7 个 scanner 实现 + 前端 `ScanPage.tsx` 全链路适配 |
 | **可逆性** | 可逆。前端保留回退逻辑（无 global_percent 时按旧方式计算局部进度） |
 
+---
+
+## ADR-018：个人目录全量扫描 + 文件类型分类
+
+| 字段 | 内容 |
+|------|------|
+| **日期** | 2026-05-29 |
+| **问题** | 入职日期作为过滤节点会遗漏"入职前下载但未修改"的个人文件。例如：2020 年下载的私人 PDF，在 2023 年入职后放到工作电脑 Desktop 上，修改日期仍然是 2020 年，按修改日期过滤会被漏掉 |
+| **候选方案** | A. 放弃日期过滤（对个人目录）<br>B. 多日期取 max（creation/modification/access）<br>C. 位置优先 + 日期兜底（个人目录全扫，其他目录按日期过滤）<br>D. 让用户选择 |
+| **决策** | 方案 C：位置优先 + 日期兜底 |
+| **理由** | 1. 个人目录（Desktop/Downloads/Documents）本身就是"个人数据"的强信号，日期过滤反而导致漏删<br>2. 其他位置（其他盘符、系统目录）按日期过滤可减少噪音<br>3. 方案 A 扫描量过大，方案 D 增加用户决策负担 |
+| **实现** | 1. 新增 `TraceItem.source` 字段（personal_desktop / personal_downloads / personal_documents / other）<br>2. 新增 `TraceItem.file_type` 字段（photo / video / audio / work_doc / code / archive / design / executable / temp / other）<br>3. scanner-fs：个人目录 `apply_date_filter=false`，其他目录 `apply_date_filter=true`<br>4. 精细去重：已扫描的个人目录在全盘扫描时跳过<br>5. 前端 ResultsPage：二级筛选 Tab（按文件类型）+ 按来源分组展示 |
+| **后果** | 个人目录文件量可能较大，但用户可按文件类型筛选，减少视觉噪音 |
+| **可逆性** | 可逆。修改 scanner-fs 的 scan() 方法即可回退 |
+
 *新增决策时复制上方模板，填写后追加到文件末尾。*
 
 ---
+---
+
+## ADR-017：GitHub 认证从 SSH 切换到 GitHub CLI + HTTPS [来源:vibe-coding-project-sop @2026-05-23] [来源:vibe-coding-project-sop @2026-05-29]
+
+| 字段 | 内容 |
+|------|------|
+| **日期** | 2026-05-23 |
+| **问题** | GitHub push 因 SSH 密钥问题失败（Permission denied publickey），如何修复？ |
+| **候选方案** | A. 修复 SSH：加载密钥 + 添加公钥到 GitHub 账户<br>B. 切换到 GitHub CLI + HTTPS 协议，由 gh 管理 Token 认证 |
+| **决策** | 方案 B：安装 GitHub CLI，使用 `gh auth login` 登录，`gh auth setup-git` 配置凭证助手，git 远程 URL 改为 HTTPS |
+| **理由** | 1. 用户明确表示不走 SSH 密钥路<br>2. `gh` 自动管理 Personal Access Token，无需手动生成和配置<br>3. HTTPS 走已配置的 HTTP 代理（127.0.0.1:7897），网络通路更稳定<br>4. 一次登录后长期有效，Token 自动刷新 |
+| **后果** | 远程 URL 从 `git@github.com:...` 改为 `https://github.com/.../...`，所有本地仓库需同步切换 |
+| **可逆性** | 可逆。随时可切回 SSH：`git remote set-url origin git@github.com:...` |
+
+*新增决策时复制上方模板，填写后追加到文件末尾。*
+---
+
+## ADR-009：Troubleshooting 索引采用独立文件 + 行号链接 [来源:vibe-coding-project-sop @2026-05-29]
+
+**日期**：2026-05-24
+**状态**：已采纳
+**上下文**：troubleshooting.md 已达 288 行/27 条目，AI 恢复时按关键词搜索效率低，且难以获取技术栈全景。
+
+**决策**：
+1. 创建 `scripts/build-troubleshooting-index.py` 自动生成 `troubleshooting-index.md`
+2. 索引为独立文件，不插入 troubleshooting.md 顶部
+3. 定位使用行号链接 `troubleshooting.md#L{line}`
+
+**考量**：
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| **A. 独立文件**（采纳） | AI 只需读 ~110 行索引；零内容污染；重建不影响原文件格式 | 多一个文件 |
+| B. 插入同文件顶部 | AI 读一个文件即可 | 必须读完 288+ 行才能看到索引；每次重建需改写原文件头部 |
+| **行号链接**（采纳） | 100% 可靠；不依赖 GitHub 锚点算法 | 编辑原文件后需重建索引 |
+| C. 标题锚点 | 语义化 | GitHub 对中文锚点生成规则复杂且不稳定 |
+
+**后果**：
+- AGENTS.md 恢复指令更新为「先读 troubleshooting-index.md 快速定位，再读 troubleshooting.md 详情」
+- 每次修改 troubleshooting.md 后需运行脚本重建索引（未来可集成到 sync-knowledge.py 自动重建）
+
+## ADR-017：init-skeleton.py 保持 Python 3.9 兼容 [来源:vibe-coding-project-sop @2026-05-29]
+
+**日期**：2026-05-26
+**状态**：已采纳
+**上下文**：macOS 12 默认 Python 3.9.6，不支持 `str | None` 和 `list[str]` 等 3.10+ 类型注解语法。用户运行 `init-skeleton.py` 直接报错 `TypeError: unsupported operand type(s) for |`。
+
+**决策**：
+1. 将所有 3.10+ 类型注解替换为 3.6+ 兼容写法
+2. 具体替换：
+   - `str | None` → `Optional[str]`
+   - `Path | None` → `Optional[Path]`
+   - `list[str]` → `List[str]`
+   - `list[tuple[str, str]]` → `List[Tuple[str, str]]`
+3. 新增 `from typing import List, Optional, Tuple`
+
+**理由**：
+1. macOS 12 是当前广泛使用的版本，默认 Python 3.9 无法直接升级
+2. 强制用户升级 Python 增加了使用门槛，与骨架"低门槛初始化"的定位冲突
+3. `typing` 模块的旧语法在所有 Python 3.x 版本中都可运行，无需额外依赖
+4. 后续新脚本也应默认采用 Python 3.9 兼容写法，直到项目明确要求 3.10+
+
+**后果**：
+- 脚本兼容性：Python 3.6 ~ 3.13 均可运行
+- 代码可读性略有下降（`Optional[str]` vs `str | None`），但这是向后兼容的必要代价
+
+## ADR-018：WebView2 安装模式选择 downloadBootstrapper
+
+**日期**：2026-05-29
+**状态**：已采纳
+**上下文**：需要确定 French Exit 安装器如何处理 WebView2 Runtime 依赖。目标用户环境可联网，Windows 10 1803+ / Windows 11 已预装 WebView2。
+
+**决策**：使用 `downloadBootstrapper` 模式（Tauri v2 默认）
+
+**理由**：
+1. 安装包最小（0 额外体积）
+2. Windows 10 1803+ / Windows 11 已预装 WebView2，无需额外操作
+3. 旧系统（Windows 7/8）用户联网时自动下载 WebView2
+4. 用户体验：双击安装包 → 下一步 → 完成
+
+**后果**：
+- 安装器需联网才能完成 WebView2 安装
+- 如果用户环境完全断网，需改用 `offlineInstaller`（+127MB）

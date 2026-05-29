@@ -6,7 +6,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Geist', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'monospace'],
+        mono: ['Geist Mono', 'SF Mono', 'Fira Code', 'monospace'],
       },
       borderRadius: {
         lg: "var(--radius)",

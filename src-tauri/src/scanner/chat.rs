@@ -145,6 +145,8 @@ impl Scanner for ChatScanner {
                     inferred: false,
                     risk_note: Some("QQ 聊天记录属于私人内容，建议处理".to_string()),
                     suggested_action: Some(Action::DeleteOrPack),
+                    source: "other".to_string(),
+                    file_type: "other".to_string(),
                 });
             }
         }
@@ -173,6 +175,8 @@ impl Scanner for ChatScanner {
                 inferred: false,
                 risk_note: Some("钉钉本地数据包含聊天记录和缓存，建议处理".to_string()),
                 suggested_action: Some(Action::DeleteOrPack),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             });
         }
         current_step += 1;
@@ -200,6 +204,8 @@ impl Scanner for ChatScanner {
                 inferred: false,
                 risk_note: Some("飞书本地数据包含聊天记录和缓存，建议处理".to_string()),
                 suggested_action: Some(Action::DeleteOrPack),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             });
         }
         current_step += 1;
@@ -234,6 +240,8 @@ impl Scanner for ChatScanner {
                     inferred: false,
                     risk_note: Some("企业微信本地数据包含工作聊天记录，建议处理".to_string()),
                     suggested_action: Some(Action::DeleteOrPack),
+                    source: "other".to_string(),
+                    file_type: "other".to_string(),
                 });
             }
         }

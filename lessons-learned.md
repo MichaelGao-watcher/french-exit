@@ -200,6 +200,15 @@
 | | 中文路径 + MinGW = 链接器失败。解决方案：复制到纯 ASCII 路径后编译 [来源:french-exit @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
 | | `cargo check --lib` 不需要链接，可以在中文路径直接跑；`cargo test --no-run` 同理 [来源:french-exit @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
 | | Windows 路径在 git bash / Node.js / cmd 中转义规则不同，写跨平台脚本时优先用正斜杠或 `path.join` [来源:blindfold-chess @2026-05-21] [来源:vibe-coding-project-sop @2026-05-22] |  |
+| | 在 Kimi Code CLI 上安装 Superpowers 需分 A/B 方案：A 方案替换 CLI 为 feat/hook-inject-prompt 分支实现自动注入；B 方案只克隆 skills 到 ~/.kimi/skills/ 手动调用，零风险 [来源:vibe-coding-project-sop @2026-05-29] | 工具链配置 | [来源:vibe-coding-project-sop @2026-05-22] |
+| | 评估 skill 是否适合当前项目时，不应只看功能描述，而应对比项目形态（纯文档/工具型项目不需要 frontend-design 等前端实现型 skill） [来源:vibe-coding-project-sop @2026-05-29] | 项目评估 | [来源:vibe-coding-project-sop @2026-05-22] |
+| | PowerShell 5.1 默认以 Windows-1252 编码读取无 BOM 的 UTF-8 文件，中文字符被解码为乱码后会破坏引号匹配，导致 UnexpectedToken 语法错误。修复方案：文件头添加 UTF-8 BOM（EF BB BF） [来源:vibe-coding-project-sop @2026-05-29] | 环境兼容 | [来源:vibe-coding-project-sop @2026-05-22] |
+| | ModelScope 首页 HTTP 访问速度（~8KB/s）与实际 CDN 模型下载速度（~2.5MB/s）差异巨大，下载 .gguf 模型文件时应直接测试 CDN 链接而非首页 [来源:vibe-coding-project-sop @2026-05-29] | 网络诊断 | [来源:vibe-coding-project-sop @2026-05-22] |
+| | GitHub 下载完全不可达时，可尝试加速镜像 gh.llkk.cc，实测速度 300KB/s+，支持断点续传 [来源:vibe-coding-project-sop @2026-05-29] | 网络诊断 | [来源:vibe-coding-project-sop @2026-05-22] |
+| | llama.cpp 的 server 模式兼容 OpenAI API 格式（/v1/chat/completions），可直接作为 Ollama 的轻量替代，体积仅 18MB vs Ollama 2GB [来源:vibe-coding-project-sop @2026-05-29] | 工具选型 | [来源:vibe-coding-project-sop @2026-05-22] |
+| | macOS 无 Homebrew 时，GitHub CLI 可直接下载官方 zip 包，解压后放到 `~/bin/` 即可使用，无需 sudo [来源:vibe-coding-project-sop @2026-05-29] | 工具链配置 | [来源:vibe-coding-project-sop @2026-05-23] |
+| | `gh` 底层是 Go 程序，默认不走系统代理。访问 GitHub API 时必须显式设置 `HTTPS_PROXY` 环境变量 [来源:vibe-coding-project-sop @2026-05-29] | 网络诊断 | [来源:vibe-coding-project-sop @2026-05-23] |
+| | 从 SSH 协议切换到 HTTPS + `gh auth setup-git` 后，`git push` 完全由 gh 管理的 Token 驱动，无需维护 SSH 密钥对 [来源:vibe-coding-project-sop @2026-05-29] | 工具链配置 | [来源:vibe-coding-project-sop @2026-05-23] |
 |
 
 ## 流程经验
@@ -272,6 +281,47 @@ unzip -o webview2.nupkg "build/native/x64/WebView2Loader.dll" -d ./extracted/
 ```
 
 配合 EdgeCore 回退检测（`WEBVIEW2_BROWSER_EXECUTABLE_FOLDER`），可在不安装 WebView2 Runtime 的系统上直接运行 Tauri 应用。
+
+### PowerShell 启动长期运行服务（如 Vite dev server）
+
+**问题**：PowerShell 中直接运行 `npm run dev` 会阻塞当前终端，无法继续对话。
+
+**方案**：用 `Start-Process` 开独立窗口运行：
+```powershell
+Start-Process cmd -ArgumentList "/c cd /d <项目路径> && npm run dev" -WindowStyle Minimized
+```
+- `/c` 执行完关闭窗口；`/k` 保持窗口打开
+- `-WindowStyle Minimized` 最小化不干扰工作
+
+**关闭**：`taskkill /F /IM node.exe`
+
+**验证**：`netstat -ano | findstr "1420"`，看到 `LISTENING` 即正常
+
+### Framer-motion 动画：initial 必须包含完整起始状态
+
+**问题**：大 Logo 使用 `initial={{ opacity: 0, y: 12 }}`，但 `animate` 包含 `left`、`top`、`x`、`fontSize` 等多个属性。首次渲染时，这些属性使用 CSS 默认值，然后跳变到 `animate` 目标值，导致视觉上"闪现"而非"浮现"。
+
+**方案**：将 `initial` 补全为完整的起始状态，确保所有属性都从初始值平滑过渡：
+```tsx
+initial={{ opacity: 0, y: 12, left: "50%", top: "32%", x: "-50%", fontSize: "3rem" }}
+```
+
+**教训**：Framer-motion 的 `initial` 只在首次渲染时应用。如果 `animate` 包含 `initial` 未定义的属性，这些属性会从 CSS 默认值跳变到目标值，破坏动画连续性。
+
+---
+
+### Tauri v2 安装器 WebView2 处理模式
+
+| 模式 | 需要联网 | 额外体积 | 适用场景 |
+|------|---------|---------|---------|
+| `downloadBootstrapper`（默认） | ✅ | 0 MB | 最小安装包，用户联网时自动下载 |
+| `embedBootstrapper` | ✅ | ~1.8 MB | Windows 7 兼容性更好 |
+| `offlineInstaller` | ❌ | ~127 MB | 完全离线环境 |
+| `fixedVersion` | ❌ | ~180 MB | 锁定特定 WebView2 版本 |
+
+**推荐**：目标环境可联网时用 `downloadBootstrapper`（默认），Windows 10 1803+ / Windows 11 已预装 WebView2。
+
+---
 
 ### 自定义日期选择器：不引入第三方库
 

@@ -458,3 +458,32 @@
 
 **遗留问题 / 下轮开始点**：
 - 如需要使用 `init-skeleton.py`，需先设置 `SOP_SKELETON_PATH` 环境变量
+
+---
+
+### 2026-05-29 14:00-16:15
+
+**目标**：UI/UX 动画迭代 + 存档
+
+**实际完成**：
+- ✅ 修复欢迎页标题居中（App.tsx 添加 `left: "50%"`）
+- ✅ 启动 Vite dev server（PowerShell Start-Process 技巧）
+- ✅ 调整动画速度（WelcomePage/InputPage 慢化）
+- ✅ 全页面浮动动画（ScanPage/ResultsPage/ConfirmPage/ExecutingPage/ReportPage 新增 motion）
+- ✅ 修复 JSX 标签不匹配错误（ConfirmPage/ResultsPage）
+- ✅ 修复大 Logo 显示逻辑（initial 补全完整起始状态）
+- ✅ 讨论安装器 WebView2 处理模式（确认用 downloadBootstrapper）
+- ✅ 母库经验同步（9 条新增）
+- ✅ 存档流程执行
+
+**关键决策**：
+- WebView2 安装模式：选择 `downloadBootstrapper`（默认），目标环境可联网，Windows 10 1803+ 已预装
+
+**遇到的阻碍 & 解决路径**：
+- **阻碍**：PowerShell 中 `npm run dev` 阻塞终端 → 解决：`Start-Process cmd` 开独立窗口
+- **阻碍**：JSX 标签不匹配（`<motion.div>` 开头 `</div>` 结尾）→ 解决：修正闭合标签
+- **阻碍**：大 Logo 首次渲染"闪现" → 解决：initial 补全 left/top/x/fontSize
+
+**遗留问题 / 下轮开始点**：
+- 安装器配置待执行（status.md 已记录 WebView2 模式）
+- 前端 UI 仍有调整空间

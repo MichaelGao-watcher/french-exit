@@ -1,3 +1,4 @@
+<!-- 母库: E:\work-space\vs-code\vibe-coding-project-sop -->
 # French Exit — Agent 启动指令
 
 > 本文件供 AI 开发助手读取。接手本项目时，**必须先读完下面列出的上下文文件**，再开始任何代码操作。

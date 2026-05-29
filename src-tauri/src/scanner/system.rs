@@ -96,6 +96,8 @@ impl SystemScanner {
                 inferred: false,
                 risk_note: Some("系统记录的最近打开文档列表".to_string()),
                 suggested_action: Some(Action::Delete),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             });
 
             processed += 1;
@@ -178,6 +180,8 @@ impl SystemScanner {
                 inferred: false,
                 risk_note: None,
                 suggested_action: Some(Action::Delete),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             });
 
             processed += 1;
@@ -245,6 +249,8 @@ impl SystemScanner {
             inferred: false,
             risk_note: Some("包含你浏览过的图片缩略图".to_string()),
             suggested_action: Some(Action::Delete),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         })
     }
 }

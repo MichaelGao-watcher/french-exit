@@ -338,6 +338,8 @@ mod tests {
             inferred: false,
             risk_note: None,
             suggested_action: Some(Action::Pack),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         };
 
         let item2 = TraceItem {
@@ -351,6 +353,8 @@ mod tests {
             inferred: false,
             risk_note: None,
             suggested_action: Some(Action::Pack),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         };
 
         executor.execute(&item1).unwrap();
@@ -376,6 +380,8 @@ mod tests {
             inferred: false,
             risk_note: None,
             suggested_action: Some(Action::Pack),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         };
 
         let item2 = TraceItem {
@@ -389,6 +395,8 @@ mod tests {
             inferred: false,
             risk_note: None,
             suggested_action: Some(Action::Pack),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         };
 
         executor.execute(&item1).unwrap();
@@ -434,6 +442,8 @@ mod tests {
             inferred: false,
             risk_note: None,
             suggested_action: Some(Action::Pack),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         };
 
         executor.execute(&item).unwrap();
@@ -468,6 +478,8 @@ mod tests {
             inferred: false,
             risk_note: None,
             suggested_action: Some(Action::Pack),
+            source: "other".to_string(),
+            file_type: "other".to_string(),
         };
 
         executor.execute(&item).unwrap();
@@ -502,6 +514,8 @@ mod tests {
                 inferred: false,
                 risk_note: None,
                 suggested_action: Some(Action::Pack),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             },
             TraceItem {
                 id: "b".to_string(),
@@ -514,6 +528,8 @@ mod tests {
                 inferred: false,
                 risk_note: None,
                 suggested_action: Some(Action::Pack),
+                source: "other".to_string(),
+                file_type: "other".to_string(),
             },
         ];
         assert_eq!(PackExecutor::total_size(&items), 3072);

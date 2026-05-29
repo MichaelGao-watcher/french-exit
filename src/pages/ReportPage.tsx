@@ -1,9 +1,33 @@
+import { motion } from "framer-motion";
 import { useAppState } from "../store/AppContext";
 import { formatBytes } from "../utils/format";
 
 export function ReportPage() {
   const { state } = useAppState();
   const report = state.report;
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+        delayChildren: 0.3,
+      },
+    },
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 12 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.8,
+        ease: [0.4, 0, 0.2, 1],
+      },
+    },
+  };
 
   if (!report) {
     return (
@@ -14,19 +38,24 @@ export function ReportPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
+    <motion.div
+      className="max-w-lg mx-auto flex flex-col items-center justify-center min-h-[70vh] text-center px-4"
+      variants={container}
+      initial="hidden"
+      animate="show"
+    >
       {/* 主文案 - 占主要空间 */}
-      <div className="flex-1 flex flex-col items-center justify-center">
+      <motion.div variants={item} className="flex-1 flex flex-col items-center justify-center">
         <h1 className="text-4xl font-semibold tracking-tight mb-4">
           清理完成
         </h1>
         <p className="text-lg text-muted-foreground">
           您已完成 French Exit，现在去享受生活吧
         </p>
-      </div>
+      </motion.div>
 
       {/* 底部明细 - 最下方小字 */}
-      <div className="mt-auto pt-16 pb-8 text-xs text-muted-foreground space-y-1">
+      <motion.div variants={item} className="mt-auto pt-16 pb-8 text-xs text-muted-foreground space-y-1">
         <p>
           已删除 {report.deleted_count} 条
           {report.deleted_bytes > 0 && `（${formatBytes(report.deleted_bytes)}）`}
@@ -40,8 +69,8 @@ export function ReportPage() {
           <p>打包文件：{report.pack_file_path}</p>
         )}
         <p>HTML 庆祝页已保存</p>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

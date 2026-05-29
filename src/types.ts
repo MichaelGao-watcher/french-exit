@@ -32,6 +32,10 @@ export interface TraceItem {
   inferred: boolean;
   risk_note: string | null;
   suggested_action: Action | null;
+  /** 来源分类：personal_desktop / personal_downloads / personal_documents / other */
+  source: string;
+  /** 文件类型分类：photo / video / audio / personal_doc / work_doc / code / archive / design / executable / temp / other */
+  file_type: string;
 }
 
 export interface Decision {

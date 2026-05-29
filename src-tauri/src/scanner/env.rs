@@ -102,6 +102,8 @@ impl Scanner for EnvVarScanner {
                     inferred: false,
                     risk_note: Some(TOKEN_RISK_NOTE.to_string()),
                     suggested_action: Some(Action::Delete),
+                    source: "other".to_string(),
+                    file_type: "other".to_string(),
                 });
                 continue;
             }
@@ -127,6 +129,8 @@ impl Scanner for EnvVarScanner {
                             inferred: false,
                             risk_note: Some(PATH_RISK_NOTE.to_string()),
                             suggested_action: Some(Action::Preserve),
+                            source: "other".to_string(),
+                            file_type: "other".to_string(),
                         });
                     }
                 }

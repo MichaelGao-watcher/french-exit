@@ -1,6 +1,7 @@
 import { useAppState } from "../store/AppContext";
 import { submitDecisions } from "../api/commands";
 import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import { formatBytes } from "../utils/format";
 import type { TraceItem } from "../types";
 
@@ -67,15 +68,43 @@ export function ConfirmPage() {
     }
   };
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.3,
+      },
+    },
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 12 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.7,
+        ease: [0.4, 0, 0.2, 1],
+      },
+    },
+  };
+
   return (
-    <div className="max-w-3xl mx-auto py-6">
+    <motion.div
+      className="max-w-3xl mx-auto py-6"
+      variants={container}
+      initial="hidden"
+      animate="show"
+    >
       {/* 顶部标题 */}
-      <div className="mb-6">
+      <motion.div variants={item} className="mb-6">
         <h2 className="text-2xl font-semibold mb-1">最终确认</h2>
         <p className="text-muted-foreground text-sm">
           请最后检查您的选择，确认后操作将不可逆
         </p>
-      </div>
+      </motion.div>
 
       <DecisionGroup items={deleteItems} icon="🗑️" title="待删除" variant="red" />
       <DecisionGroup items={packItems} icon="📦" title="待打包" variant="blue" />
@@ -139,7 +168,7 @@ export function ConfirmPage() {
       {state.error && (
         <p className="mt-4 text-sm text-center">{state.error}</p>
       )}
-    </div>
+    </motion.div>
   );
 }
 
