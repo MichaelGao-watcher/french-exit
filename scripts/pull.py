@@ -1,167 +1,151 @@
 #!/usr/bin/env python3
 """
-其他项目从母库一键初始化脚本。
+母库经验拉取脚本（分发模式）
+从 vibe-coding-project-sop 母库拉取最新经验到当前项目。
 
-用法：
-    python init-from-skeleton.py
+用法:
+    python pull.py [--skeleton SKELETON_PATH] [--force]
 
-功能：
-1. 自动创建 config/github-sync.json（预填母库信息）
-2. 自动下载/更新 scripts/sync-knowledge.py
-3. 自动运行同步，拉取母库经验文件
-4. 提示 AGENTS 规则插入方法
-
-依赖：
-    pip install requests
+环境变量:
+    SOP_SKELETON_PATH  母库项目根目录路径
 """
 
-import json
+import argparse
 import os
 import sys
-import io
 from pathlib import Path
+from typing import List, Optional, Tuple
 
-# Windows 终端 UTF-8 支持
-if sys.platform == "win32":
-    try:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    except Exception:
-        pass
 
-try:
-    import requests
-except ImportError:
-    print("[init] 错误: 需要安装 requests 库。运行: pip install requests")
-    sys.exit(1)
+KNOWLEDGE_FILES = [
+    "lessons-learned.md",
+    "troubleshooting.md",
+    "decisions.md",
+]
 
-# ===== 母库配置（硬编码，其他项目无需修改） =====
-MOTHER_REPO = "vibe-coding-project-sop"
-MOTHER_USERNAME = "MichaelGao1999"
-MOTHER_BRANCH = "master"
-RAW_BASE = f"https://raw.githubusercontent.com/{MOTHER_USERNAME}/{MOTHER_REPO}/{MOTHER_BRANCH}"
-TARGET_FILES = ["decisions.md", "lessons-learned.md", "troubleshooting.md"]
+AGENTS_FRAGMENT = """## 3.7 母库经验指令（「拉取母库」）
+
+**触发词**：`拉取母库`、`拉取经验`、`更新经验`（去除标点后精确匹配任一）
+
+**防误触**：
+- 消息精确匹配上述任一触发词 → 执行母库经验同步流程
+- 消息包含触发词但还有其他内容 → 视为正常对话，不触发
+
+**执行流程**：
+1. 读取项目中 `<!-- 母库: <路径> -->` 注释，获取母库路径
+2. 运行 `python <母库路径>/scripts/pull.py --skeleton <母库路径>`
+3. 汇报同步结果
+"""
 
 
 def log(msg: str) -> None:
-    print(f"[init] {msg}")
+    print(f"[pull] {msg}")
 
 
-def fetch_raw(filepath: str) -> str | None:
-    url = f"{RAW_BASE}/{filepath}"
-    try:
-        resp = requests.get(url, timeout=30)
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        return resp.text
-    except requests.RequestException as e:
-        log(f"拉取失败: {url} -> {e}")
+def error(msg: str) -> None:
+    print(f"[pull] ERROR: {msg}", file=sys.stderr)
+
+
+def find_skeleton_path(args_path: Optional[str]) -> Optional[Path]:
+    """定位母库路径"""
+    if args_path:
+        p = Path(args_path).resolve()
+        if p.is_dir() and (p / "scripts" / "pull.py").exists():
+            return p
+        error(f"母库路径无效: {p}")
         return None
 
+    env_path = os.environ.get("SOP_SKELETON_PATH")
+    if env_path:
+        p = Path(env_path).resolve()
+        if p.is_dir():
+            return p
 
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
-def write_file(path: Path, content: str) -> None:
-    ensure_dir(path.parent)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
-
-
-def create_config() -> Path:
-    config_path = Path("config/github-sync.json")
-    if config_path.exists():
-        log(f"配置文件已存在: {config_path}")
-        with open(config_path, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
-        if cfg.get("syncFrom"):
-            log(f"  syncFrom 已配置为: {cfg['syncFrom']}")
-        else:
-            log("  syncFrom 为空，将设置为母库...")
-            cfg["syncFrom"] = MOTHER_REPO
-            write_file(config_path, json.dumps(cfg, indent=2, ensure_ascii=False))
-            log("  已更新 syncFrom")
-        return config_path
-
-    config = {
-        "_comment": "由 init-from-skeleton.py 自动生成。修改后运行 scripts/sync-knowledge.py 同步更新。",
-        "username": MOTHER_USERNAME,
-        "token": "",
-        "includeRepos": [],
-        "excludeRepos": [],
-        "syncFrom": MOTHER_REPO,
-        "_syncFromComment": "只从指定母库拉取经验。如需改为聚合模式（遍历所有仓库），请清空此字段。",
-        "targetFiles": TARGET_FILES,
-        "branch": "master",
-        "backupBeforeMerge": True,
-        "mergeStrategy": {
-            "lessonsLearned": {"dedupBy": "description", "action": "mergeSources"},
-            "troubleshooting": {"dedupBy": "keyword", "action": "keepLongestSolution"},
-            "decisions": {"dedupBy": "none", "action": "appendAll"}
-        }
-    }
-    write_file(config_path, json.dumps(config, indent=2, ensure_ascii=False))
-    log(f"已创建配置文件: {config_path}")
-    return config_path
+    error("请指定母库路径 --skeleton 或设置 SOP_SKELETON_PATH 环境变量")
+    return None
 
 
-def download_sync_script() -> Path:
-    script_path = Path("scripts/sync-knowledge.py")
-    log("正在下载同步脚本...")
-    content = fetch_raw("scripts/sync-knowledge.py")
-    if content is None:
-        log("错误: 无法下载同步脚本，请检查网络连接")
-        sys.exit(1)
-    write_file(script_path, content)
-    log(f"已更新同步脚本: {script_path}")
-    return script_path
+def copy_file(src: Path, dst: Path, force: bool = False) -> str:
+    """复制文件，返回操作结果"""
+    if dst.exists() and not force:
+        return "skipped"
+
+    result = "overwritten" if dst.exists() else "created"
+    dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    return result
 
 
-def run_sync() -> int:
-    log("开始从母库同步经验...")
-    import subprocess
-    result = subprocess.run(
-        [sys.executable, "scripts/sync-knowledge.py"],
-        capture_output=True,
-        text=True
-    )
-    print(result.stdout)
-    if result.returncode != 0:
-        print(result.stderr)
-    return result.returncode
+def ensure_agents_fragment(target_dir: Path) -> bool:
+    """确保 AGENTS.md 中包含母库经验指令"""
+    agents_file = target_dir / "AGENTS.md"
+    if not agents_file.exists():
+        return False
 
+    content = agents_file.read_text(encoding="utf-8")
+    if "拉取母库" in content or "拉取经验" in content or "母库经验" in content:
+        return True
 
-def print_agents_guide() -> None:
-    agents_url = f"{RAW_BASE}/templates/agents-for-others.md"
-    print("\n" + "=" * 50)
-    print("📋 AGENTS 规则")
-    print("=" * 50)
-    print(f"其他项目专用指令：{agents_url}")
-    print("=" * 50)
-
-
-def print_summary() -> None:
-    print("\n" + "=" * 50)
-    print("✅ 拉取完成")
-    print("=" * 50)
-    print("📁 配置文件：config/github-sync.json")
-    print("📄 同步文件：decisions.md, lessons-learned.md, troubleshooting.md")
-    print("\n💡 下次更新：python scripts/pull.py")
-    print("=" * 50)
+    # 追加触发词指令
+    with open(agents_file, "a", encoding="utf-8") as f:
+        f.write("\n\n---\n\n" + AGENTS_FRAGMENT)
+    return True
 
 
 def main() -> int:
-    log("开始从母库拉取...")
-    log(f"母库: {MOTHER_USERNAME}/{MOTHER_REPO} ({MOTHER_BRANCH})")
+    parser = argparse.ArgumentParser(description="从母库拉取经验")
+    parser.add_argument("--skeleton", help="母库项目根目录路径")
+    parser.add_argument("--force", action="store_true", help="覆盖已有文件")
+    args = parser.parse_args()
 
-    create_config()
-    download_sync_script()
-    sync_rc = run_sync()
-    print_agents_guide()
-    print_summary()
+    skeleton_path = find_skeleton_path(args.skeleton)
+    if not skeleton_path:
+        return 1
 
-    return sync_rc
+    target_dir = Path.cwd()
+    log(f"母库路径: {skeleton_path}")
+    log(f"当前项目: {target_dir}")
+
+    results: List[Tuple[str, str]] = []
+
+    for fname in KNOWLEDGE_FILES:
+        src = skeleton_path / fname
+        dst = target_dir / fname
+        if src.exists():
+            result = copy_file(src, dst, args.force)
+            results.append((fname, result))
+        else:
+            error(f"母库文件缺失: {src}")
+
+    # 确保 AGENTS.md 有触发词指令
+    ensure_agents_fragment(target_dir)
+
+    # 输出报告
+    print("\n" + "=" * 40)
+    print("拉取结果")
+    print("=" * 40)
+
+    created = [f for f, r in results if r == "created"]
+    skipped = [f for f, r in results if r == "skipped"]
+    overwritten = [f for f, r in results if r == "overwritten"]
+
+    if created:
+        print(f"\n[+] 新增 ({len(created)}):")
+        for f in created:
+            print(f"    {f}")
+
+    if skipped:
+        print(f"\n[-] 已存在 ({len(skipped)}):")
+        for f in skipped:
+            print(f"    {f}")
+
+    if overwritten:
+        print(f"\n[~] 已更新 ({len(overwritten)}):")
+        for f in overwritten:
+            print(f"    {f}")
+
+    print(f"\n[>] 下次使用: 在项目中说「拉取母库」即可拉取最新内容")
+
+    return 0
 
 
 if __name__ == "__main__":
