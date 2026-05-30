@@ -1129,3 +1129,54 @@
 
 **用户说「存储」时**，AI 应回顾本轮会话内容，评估是否有新的具体报错需要记入本文件。有则按模板追加；没有则跳过。
 ---
+
+### Hermes Agent Git 合并冲突导致 SyntaxError [来源:vibe-coding-project-sop @2026-05-31]
+
+| | 内容 |
+|---|---|
+| **状态** | 已修复 |
+| **现象** | `hermes --version` 报错 `SyntaxError: invalid syntax`，指向 `hermes_cli/__init__.py` 第 17 行 `<<<<<<< HEAD` |
+| **原因** | pipx 安装 hermes-agent 时，Git pull 更新源代码产生了 50+ 个未解决的合并冲突。`~/.hermes/hermes-agent/` 目录被重命名为 `hermes-agent.bak`，导致原路径失效 |
+| **解决** | 1. 将 `hermes-agent.bak` 重命名回 `hermes-agent`<br>2. 手动修复 `__init__.py` 中的冲突（保留最新版本 0.15.1）<br>3. 发现 50+ 个冲突文件后，改用 `pipx uninstall hermes-agent && pipx install hermes-agent` 重新安装<br>4. 修复 `~/.local/bin/hermes` 符号链接指向新的 pipx venv 路径 |
+| **预防** | 不要在 hermes-agent 源码目录中执行 `git pull`，除非确认没有本地修改；优先使用 `pipx reinstall` 更新 |
+
+---
+
+### Node.js 环境污染：Hermes Node.js 泄漏到用户 PATH [来源:vibe-coding-project-sop @2026-05-31]
+
+| | 内容 |
+|---|---|
+| **状态** | 已修复 |
+| **现象** | `npm install -g xxx` 安装到 `~/.hermes/node/` 目录，与 Hermes 内部环境混在一起 |
+| **原因** | 1. `~/.zshrc` 中有 `export PATH="$HOME/.hermes/node/bin:$PATH"`<br>2. `~/.local/bin/` 中有指向 Hermes Node.js 的符号链接（node、npm、npx）<br>3. npm prefix 被设置为 `~/.hermes/node` |
+| **解决** | 1. 安装 nvm（Node Version Manager）管理用户独立的 Node.js<br>2. 使用 nvm 安装 Node.js 22（`nvm install 22`）<br>3. 从 `~/.zshrc` 移除 `export PATH="$HOME/.hermes/node/bin:$PATH"`<br>4. 删除 `~/.local/bin/` 中指向 Hermes 的 node/npm/npx 符号链接<br>5. 重新安装 CodeBuddy（`npm install -g @tencent-ai/codebuddy-code`） |
+| **验证** | `which node` → `~/.nvm/versions/node/v22.22.3/bin/node`；`which codebuddy` → `~/.nvm/versions/node/v22.22.3/bin/codebuddy` |
+| **教训** | Hermes 自带完整的 Node.js 环境，安装时会污染用户 PATH。必须手动清理或使用 nvm 隔离 |
+
+---
+
+## 存档提示
+
+**用户说「存储」时**，AI 应回顾本轮会话内容，评估是否有新的具体报错需要记入本文件。有则按模板追加；没有则跳过。
+---
+
+### CodeBuddy 安装后 package.json 丢失导致命令不可用 [来源:vibe-coding-project-sop @2026-05-31]
+
+| | 内容 |
+|---|---|
+| **状态** | 已修复 |
+| **现象** | `codebuddy` 和 `cbc` 命令提示 `zsh: command not found`；手动运行 bin 目录下的 codebuddy 文件提示 `no such file or directory` |
+| **原因** | npm 全局安装路径在 `~/.hermes/node/lib/` 下（Hermes 自带 Node.js 环境），安装过程中 package.json 丢失，导致 npm 无法识别已安装的包，bin 链接未创建 |
+| **解决** | 1. 删除损坏的安装目录：`rm -rf ~/.hermes/node/lib/node_modules/@tencent-ai/codebuddy-code`<br>2. 重新安装：`npm install -g @tencent-ai/codebuddy-code`<br>3. 验证：`which codebuddy` 和 `codebuddy --version` |
+
+---
+
+*新增条目时复制上方模板，按"错误关键词"作为标题，便于快速搜索。*
+
+---
+
+## 存档提示
+
+**用户说「存储」时**，AI 应回顾本轮会话内容，评估是否有新的具体报错需要记入本文件。有则按模板追加；没有则跳过。
+---
+
