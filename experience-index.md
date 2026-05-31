@@ -3,7 +3,7 @@
 > 本文件由 `scripts/build-experience-index.py` 自动生成。
 > 覆盖 troubleshooting / lessons-learned / decisions，统一搜索入口。
 
-> 当前收录 **247** 条记录（问题 109 + 经验 98 + 决策 40）。
+> 当前收录 **248** 条记录（问题 109 + 经验 98 + 决策 41）。
 
 ---
 
@@ -258,6 +258,7 @@
 | ADR-017：聚焦 Excel 驱动流，API 驱动流暂不投入 [来源:qianniu_business_analyt... | 决策 | 架构决策 | qianniu_business_analytics | — | decisions.md#L584 |
 | ADR-019：Node.js 环境隔离方案（nvm + 双 Node.js） [母库 @2026-05-30] | 决策 | 架构决策 | vibe-coding-project-sop | — | decisions.md#L598 |
 | ADR-020：状态文档机制重构（待办清理 + 技术债务表格化） [母库 @2026-05-30] | 决策 | 架构决策 | vibe-coding-project-sop | — | decisions.md#L612 |
+| ADR-021：分发逻辑从覆盖文件改为按条目合并 [母库 @2026-05-31] | 决策 | 架构决策 | vibe-coding-project-sop | — | decisions.md#L624 |
 
 ---
 
@@ -591,6 +592,7 @@
 - [决策] ADR-005：报告形态（Markdown 四段式，单店/多店统一） — `架构决策` → decisions.md#L566
 - [决策] ADR-017：聚焦 Excel 驱动流，API 驱动流暂不投入 [来源:qianniu_busin — `架构决策` → decisions.md#L584
 - [决策] ADR-020：状态文档机制重构（待办清理 + 技术债务表格化） [母库 @2026-05-30] — `架构决策` → decisions.md#L612
+- [决策] ADR-021：分发逻辑从覆盖文件改为按条目合并 [母库 @2026-05-31] — `架构决策` → decisions.md#L624
 
 ---
 
@@ -644,7 +646,7 @@
 - **复制粘贴是 i18n 错误的常见来源**：将中文值直接粘贴进英文字典，或反之，属于低级但高频的疏忽 → lessons-learned.md#L33
 - ... 还有 78 条
 
-### 决策（40 条）
+### 决策（41 条）
 
 - ADR-001：前端技术栈选型 → decisions.md#L8
 - ADR-002：测试框架选型 → decisions.md#L22
@@ -666,4 +668,4 @@
 - ADR-008：默认深色主题而非跟随系统 → decisions.md#L240
 - ADR-009：全选全部功能的技术方案 → decisions.md#L252
 - ADR-010：路径交互设计 — 文本可点击 vs 独立按钮 → decisions.md#L264
-- ... 还有 20 条
+- ... 还有 21 条
